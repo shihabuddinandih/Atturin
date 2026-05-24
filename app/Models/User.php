@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\AdminWalletWithdrawal;
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -31,6 +32,10 @@ class User extends Authenticatable
         'email',
         'password',
         'role',
+        'phone',
+        'community_name',
+        'payment_method',
+        'payment_account',
     ];
 
     /**
@@ -67,5 +72,13 @@ class User extends Authenticatable
     public function events()
     {
         return $this->hasMany(Event::class, 'admin_id');
+    }
+
+    /**
+     * Get withdrawal requests created by this admin.
+     */
+    public function withdrawals()
+    {
+        return $this->hasMany(AdminWalletWithdrawal::class, 'admin_id');
     }
 }

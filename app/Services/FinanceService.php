@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Enums\JoinStatus;
 use App\Enums\PaymentStatus;
+use App\Models\AdminWalletWithdrawal;
 use Illuminate\Support\Facades\DB;
 
 class FinanceService
@@ -128,5 +129,59 @@ class FinanceService
             ->orderByDesc('mp.created_at')
             ->limit($limit)
             ->get();
+    }
+
+    public function getWalletSummary(int $adminId): array
+    {
+        $totals = DB::table('events as m')
+            ->leftJoin('event_player as mp', 'mp.event_id', '=', 'm.id')
+            ->select(
+                DB::raw("SUM(CASE WHEN mp.payment_status = '" . PaymentStatus::PAID->value . "' THEN mp.payment_amount ELSE 0 END) as total_collected")
+            )
+            ->where('m.admin_id', $adminId)
+            ->whereNull('m.deleted_at')
+            ->first();
+
+        $withdrawals = DB::table('admin_wallet_withdrawals')
+            ->where('admin_id', $adminId)
+            ->select(
+                DB::raw("SUM(CASE WHEN status = 'completed' THEN amount ELSE 0 END) as total_completed"),
+                DB::raw("SUM(CASE WHEN status = 'pending' THEN amount ELSE 0 END) as total_pending")
+            )
+            ->first();
+
+        $totalCollected = (float) ($totals->total_collected ?? 0);
+        $totalCompleted = (float) ($withdrawals->total_completed ?? 0);
+        $totalPending = (float) ($withdrawals->total_pending ?? 0);
+        $available = max(0, $totalCollected - $totalCompleted - $totalPending);
+
+        return [
+            'total_collected' => $totalCollected,
+            'total_withdrawn' => $totalCompleted,
+            'total_pending' => $totalPending,
+            'available' => $available,
+        ];
+    }
+
+    public function getWithdrawalHistory(int $adminId, int $limit = 8)
+    {
+        return AdminWalletWithdrawal::where('admin_id', $adminId)
+            ->orderByDesc('requested_at')
+            ->orderByDesc('created_at')
+            ->limit($limit)
+            ->get();
+    }
+
+    public function createWithdrawal(int $adminId, array $data)
+    {
+        return AdminWalletWithdrawal::create([
+            'admin_id' => $adminId,
+            'amount' => $data['amount'],
+            'payment_method' => $data['payment_method'],
+            'payment_account' => $data['payment_account'],
+            'note' => $data['note'] ?? null,
+            'status' => 'pending',
+            'requested_at' => now(),
+        ]);
     }
 }

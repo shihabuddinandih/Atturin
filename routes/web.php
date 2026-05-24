@@ -4,6 +4,7 @@ use App\Http\Controllers\AdminDashboardController;
 use App\Http\Controllers\AdminEventController;
 use App\Http\Controllers\AdminFinanceController;
 use App\Http\Controllers\AdminMemberController;
+use App\Http\Controllers\AdminSettingsController;
 use App\Http\Controllers\PlayerJoinController;
 use App\Http\Controllers\ProfileController;
 use Illuminate\Support\Facades\Route;
@@ -25,7 +26,8 @@ Route::prefix('admin')->name('admin.')->group(function () {
 
     Route::middleware('auth')->group(function () {
         Route::get('dashboard', [AdminDashboardController::class, 'index'])->name('dashboard');
-        Route::view('settings', 'admin.settings.index')->name('settings.index');
+        Route::get('settings', [AdminSettingsController::class, 'index'])->name('settings.index');
+        Route::patch('settings', [AdminSettingsController::class, 'update'])->name('settings.update');
         Route::view('notifications', 'admin.notifications.index')->name('notifications.index');
         Route::view('faq', 'admin.faq.index')->name('faq.index');
 
@@ -42,6 +44,11 @@ Route::prefix('admin')->name('admin.')->group(function () {
 
         // Finances (dedicated controller)
         Route::get('finances', [AdminFinanceController::class, 'index'])->name('finances.index');
+        Route::post('finances/withdraw', [AdminFinanceController::class, 'withdraw'])->name('finances.withdraw');
+        Route::post('finances/withdrawals/{withdrawal}/process', [AdminFinanceController::class, 'processWithdrawal'])->name('finances.withdrawals.process');
+
+        // Subscription packages
+        Route::view('subscriptions', 'admin.subscriptions.index')->name('subscriptions.index');
     });
 });
 

@@ -46,6 +46,162 @@
         </div>
     </div>
 
+    @php
+        $paymentMethodLabels = [
+            'bank' => 'Transfer Bank / Rekening',
+            'ovo' => 'OVO',
+            'dana' => 'DANA',
+            'gopay' => 'GoPay',
+            'shopeepay' => 'ShopeePay',
+        ];
+        $adminPaymentMethod = auth()->user()->payment_method;
+        $adminPaymentAccount = auth()->user()->payment_account;
+    @endphp
+
+    <div class="grid grid-cols-1 xl:grid-cols-3 gap-6 print:hidden">
+        <div class="pro-card p-6 xl:col-span-2">
+            <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                    <h2 class="text-lg font-semibold text-gray-900">Dompet Admin</h2>
+                    <p class="text-sm text-gray-500 mt-1">Saldo yang dapat ditarik berdasarkan pembayaran terkumpul.</p>
+                </div>
+                <div class="rounded-3xl bg-emerald-50 border border-emerald-200 px-5 py-4 text-right">
+                    <p class="text-xs uppercase tracking-wider text-emerald-700 font-semibold">Saldo tersedia</p>
+                    <p class="mt-3 text-3xl font-bold text-emerald-700">Rp {{ number_format($walletSummary['available'], 0, ',', '.') }}</p>
+                </div>
+            </div>
+
+            <div class="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="rounded-3xl border border-gray-200 bg-white p-4">
+                    <p class="text-xs uppercase tracking-wider text-gray-400">Total terkumpul</p>
+                    <p class="mt-3 text-xl font-semibold text-gray-900">Rp {{ number_format($walletSummary['total_collected'], 0, ',', '.') }}</p>
+                </div>
+                <div class="rounded-3xl border border-gray-200 bg-white p-4">
+                    <p class="text-xs uppercase tracking-wider text-gray-400">Sudah ditarik</p>
+                    <p class="mt-3 text-xl font-semibold text-gray-900">Rp {{ number_format($walletSummary['total_withdrawn'], 0, ',', '.') }}</p>
+                </div>
+                <div class="rounded-3xl border border-gray-200 bg-white p-4">
+                    <p class="text-xs uppercase tracking-wider text-gray-400">Pending</p>
+                    <p class="mt-3 text-xl font-semibold text-gray-900">Rp {{ number_format($walletSummary['total_pending'], 0, ',', '.') }}</p>
+                </div>
+            </div>
+
+            <div class="mt-6 rounded-3xl border border-gray-200 bg-white p-5">
+                <p class="text-xs uppercase tracking-wider text-gray-400">Tujuan Penarikan Default</p>
+                <p class="mt-3 text-sm text-gray-900">{{ $paymentMethodLabels[$adminPaymentMethod] ?? 'Belum diatur' }}</p>
+                <p class="text-sm text-gray-500 mt-1">{{ $adminPaymentAccount ?? 'Belum diatur' }}</p>
+            </div>
+        </div>
+
+        <div class="space-y-6">
+            <div class="pro-card p-6">
+                <h3 class="text-base font-semibold text-gray-900">Ajukan Penarikan</h3>
+                <p class="text-sm text-gray-500 mt-1">Gunakan rekening/e-wallet di Settings untuk demo penarikan.</p>
+
+                <form action="{{ route('admin.finances.withdraw') }}" method="POST" class="mt-6 space-y-4">
+                    @csrf
+
+                    <div>
+                        <label class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Jumlah Penarikan</label>
+                        <input type="text" name="amount" id="withdrawAmount" inputmode="numeric" pattern="[0-9]*" value="{{ old('amount') }}" class="mt-2 w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm" placeholder="Masukkan jumlah penarikan">
+                    </div>
+
+                    <div>
+                        <label class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Metode Penarikan</label>
+                        <select name="payment_method" id="withdrawMethod" class="mt-2 w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm">
+                            <option value="">Gunakan default di Settings ({{ $paymentMethodLabels[$adminPaymentMethod] ?? 'Belum diatur' }})</option>
+                            @foreach($paymentMethodLabels as $value => $label)
+                                <option value="{{ $value }}" {{ old('payment_method') === $value ? 'selected' : '' }}>{{ $label }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Rekening / ID E-Wallet</label>
+                        <input type="text" name="payment_account" id="withdrawAccount" value="{{ old('payment_account') }}" class="mt-2 w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm" placeholder="contoh: 1234567890 atau admin@bank.com">
+                        <p id="withdrawDefaultInfo" class="mt-2 text-xs text-gray-500">Jika kosong, akan menggunakan default dari Settings.</p>
+                    </div>
+
+                    <div>
+                        <label class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Catatan</label>
+                        <textarea name="note" rows="2" class="mt-2 w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm" placeholder="Contoh: Penarikan dana event April">{{ old('note') }}</textarea>
+                    </div>
+
+                    <button type="submit" class="w-full rounded-xl bg-brand-500 px-4 py-3 text-sm font-semibold text-white hover:bg-brand-600">Ajukan Penarikan</button>
+                </form>
+            </div>
+
+            <div class="pro-card p-6">
+                <h3 class="text-base font-semibold text-gray-900">Riwayat Penarikan</h3>
+                <p class="text-sm text-gray-500 mt-1">Lihat status penarikan dan proses demo jika perlu.</p>
+
+                <div class="mt-5 space-y-4">
+                    @forelse($withdrawals as $withdrawal)
+                        <div class="rounded-3xl border border-gray-200 bg-white p-4">
+                            <div class="flex items-start justify-between gap-4">
+                                <div>
+                                    <p class="text-sm font-semibold text-gray-900">Rp {{ number_format($withdrawal->amount, 0, ',', '.') }}</p>
+                                    <p class="text-xs text-gray-500 mt-1">{{ $paymentMethodLabels[$withdrawal->payment_method] ?? $withdrawal->payment_method }} • {{ $withdrawal->payment_account }}</p>
+                                </div>
+                                <span class="inline-flex items-center rounded-full bg-gray-100 px-3 py-1 text-[11px] font-semibold uppercase tracking-wider text-gray-600">{{ $withdrawal->status }}</span>
+                            </div>
+
+                            <p class="mt-3 text-[12px] text-gray-500">{{ $withdrawal->note ?? 'Tidak ada catatan.' }}</p>
+                            <p class="mt-2 text-[12px] text-gray-400">Diminta {{ $withdrawal->requested_at?->translatedFormat('d M Y H:i') }}</p>
+
+                            @if($withdrawal->status === 'pending')
+                                <form action="{{ route('admin.finances.withdrawals.process', $withdrawal) }}" method="POST" class="mt-4">
+                                    @csrf
+                                    <button type="submit" class="w-full rounded-xl bg-brand-500 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-600">Proses Demo</button>
+                                </form>
+                            @endif
+                        </div>
+                    @empty
+                        <p class="text-sm text-gray-500">Belum ada permintaan penarikan.</p>
+                    @endforelse
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const defaultMethod = @json($adminPaymentMethod ?? '');
+            const defaultAccount = @json($adminPaymentAccount ?? '');
+            const defaultLabel = @json($paymentMethodLabels[$adminPaymentMethod] ?? 'Belum diatur');
+            const methodInput = document.getElementById('withdrawMethod');
+            const accountInput = document.getElementById('withdrawAccount');
+            const defaultInfo = document.getElementById('withdrawDefaultInfo');
+
+            function updateDefaultInfo() {
+                if (!methodInput || !accountInput || !defaultInfo) {
+                    return;
+                }
+
+                const selectedValue = methodInput.value;
+                if (selectedValue === '') {
+                    defaultInfo.textContent = defaultAccount
+                        ? `Akan menggunakan default dari Settings: ${defaultLabel} • ${defaultAccount}`
+                        : 'Silakan lengkapi metode penarikan dan akun di Settings terlebih dahulu.';
+                    if (!accountInput.value) {
+                        accountInput.value = defaultAccount;
+                    }
+                } else {
+                    defaultInfo.textContent = 'Masukkan rekening atau ID e-wallet khusus untuk penarikan ini, atau kosongkan untuk menggunakan default Settings.';
+                    if (accountInput.value === defaultAccount) {
+                        accountInput.value = '';
+                    }
+                }
+            }
+
+            if (methodInput) {
+                methodInput.addEventListener('change', updateDefaultInfo);
+            }
+
+            updateDefaultInfo();
+        });
+    </script>
+
     {{-- 2. Filter & Search Panel --}}
     <form action="{{ route('admin.finances.index') }}" method="GET" class="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between print:hidden">
         <div class="flex-1 max-w-md relative">

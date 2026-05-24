@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\AdminWalletWithdrawal;
 use App\Services\FinanceService;
 use Illuminate\Http\Request;
 
@@ -78,7 +79,60 @@ class AdminFinanceController extends Controller
         });
 
         $summary = $this->financeService->getSummary($adminId);
+        $walletSummary = $this->financeService->getWalletSummary($adminId);
+        $withdrawals = $this->financeService->getWithdrawalHistory($adminId);
 
-        return view('admin.finances.index', compact('financeRows', 'summary', 'search', 'method'));
+        return view('admin.finances.index', compact('financeRows', 'summary', 'walletSummary', 'withdrawals', 'search', 'method'));
+    }
+
+    public function withdraw(Request $request)
+    {
+        $admin = $request->user();
+        $walletSummary = $this->financeService->getWalletSummary($admin->id);
+
+        $validated = $request->validate([
+            'amount' => ['required', 'numeric', 'min:1'],
+            'payment_method' => ['nullable', 'string'],
+            'payment_account' => ['nullable', 'string', 'max:255'],
+            'note' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        if ($validated['amount'] > $walletSummary['available']) {
+            return redirect()->route('admin.finances.index')->with('error', 'Jumlah penarikan melebihi saldo dompet tersedia.');
+        }
+
+        $paymentMethod = $validated['payment_method'] ?: $admin->payment_method;
+        $paymentAccount = $validated['payment_account'] ?: $admin->payment_account;
+
+        if (empty($paymentMethod) || empty($paymentAccount)) {
+            return redirect()->route('admin.finances.index')->with('error', 'Silakan atur metode penarikan dan nomor rekening/e-wallet di Settings terlebih dahulu.');
+        }
+
+        $this->financeService->createWithdrawal($admin->id, [
+            'amount' => $validated['amount'],
+            'payment_method' => $paymentMethod,
+            'payment_account' => $paymentAccount,
+            'note' => $validated['note'] ?? null,
+        ]);
+
+        return redirect()->route('admin.finances.index')->with('success', 'Permintaan penarikan berhasil dibuat. Status: Pending.');
+    }
+
+    public function processWithdrawal(AdminWalletWithdrawal $withdrawal)
+    {
+        if ($withdrawal->admin_id !== auth()->id()) {
+            abort(403);
+        }
+
+        if ($withdrawal->status !== 'pending') {
+            return redirect()->route('admin.finances.index')->with('error', 'Penarikan hanya dapat diproses jika statusnya pending.');
+        }
+
+        $withdrawal->update([
+            'status' => 'completed',
+            'processed_at' => now(),
+        ]);
+
+        return redirect()->route('admin.finances.index')->with('success', 'Penarikan berhasil diselesaikan (demo).');
     }
 }
