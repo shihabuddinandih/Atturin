@@ -37,6 +37,23 @@ class PlayerJoinController extends Controller
 
         if ($event->skema_iuran === 'custom') {
             $eventRoles = collect($event->roles ?? []);
+
+            // helper to compute admin fee based on requested tier rules:
+            // <=49_000 => +1_500
+            // <=99_000 => +3_000
+            // >=100_000 => +3% of base
+            $computeAdminFee = function (float $base, string $method) {
+                if ($method !== 'online_banking') {
+                    return 0;
+                }
+                if ($base <= 49000) {
+                    return 1500;
+                }
+                if ($base <= 99000) {
+                    return 3000;
+                }
+                return (int) round($base * 0.03);
+            };
             $joinedByRole = $event->players()
                 ->wherePivot('status_join', 'joined')
                 ->orderBy('event_player.created_at', 'asc')
@@ -50,14 +67,19 @@ class PlayerJoinController extends Controller
                 return $player->pivot->role_name ?? 'Tanpa Role';
             });
 
-            $rolesWithAvailability = $eventRoles->map(function ($role) use ($roleCounts) {
+            $rolesWithAvailability = $eventRoles->map(function ($role) use ($roleCounts, $event, $computeAdminFee) {
                 $joinedForRole = $roleCounts[$role['name']] ?? 0;
                 $slots = isset($role['slots']) ? (int) $role['slots'] : 0;
+                $base = isset($role['price']) ? (float) $role['price'] : 0;
+                $admin = $computeAdminFee($base, $event->metode_pembayaran);
+                $display = $base + $admin;
 
                 return array_merge($role, [
                     'joined' => $joinedForRole,
                     'slots_left' => max(0, $slots - $joinedForRole),
                     'is_full' => $slots <= 0 || $joinedForRole >= $slots,
+                    'admin_fee' => $admin,
+                    'display_price' => $display,
                 ]);
             })->all();
 
@@ -134,10 +156,21 @@ class PlayerJoinController extends Controller
             $baseFee = (float) $event->iuran_per_pemain;
         }
 
-        $adminFee = 0;
-        if ($event->metode_pembayaran === 'online_banking') {
-            $adminFee = (int) round($baseFee * 0.03);
-        }
+        // compute admin fee using same tier rules as in show()
+        $computeAdminFee = function (float $base, string $method) {
+            if ($method !== 'online_banking') {
+                return 0;
+            }
+            if ($base <= 49000) {
+                return 1500;
+            }
+            if ($base <= 99000) {
+                return 3000;
+            }
+            return (int) round($base * 0.03);
+        };
+
+        $adminFee = $computeAdminFee($baseFee, $event->metode_pembayaran);
 
         $fee = $baseFee + $adminFee;
 
