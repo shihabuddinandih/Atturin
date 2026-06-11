@@ -54,8 +54,14 @@
 
     @php
         $slotPercentage = $event->slot_max > 0 ? min(100, (int) round(($joinedCount / $event->slot_max) * 100)) : 0;
-        $paymentLabel = $event->metode_pembayaran === 'online_banking' ? 'Online Banking' : 'Tunai ke Admin';
+        $paymentLabel = $event->metode_pembayaran === 'online_banking' ? 'QRIS' : 'Tunai ke Admin';
         $slotsLeft = $event->slot_max - $joinedCount;
+        $isCustomEvent = $event->skema_iuran === 'custom';
+        $rolesWithAvailability = $rolesWithAvailability ?? [];
+        $customRoles = count($rolesWithAvailability) ? $rolesWithAvailability : ($event->roles ?? []);
+        $basePrice = $isCustomEvent && count($customRoles) > 0 ? min(array_column($customRoles, 'price')) : (float) $event->iuran_per_pemain;
+        $displayPrice = $event->metode_pembayaran === 'online_banking' ? (int) round($basePrice * 1.03) : $basePrice;
+        $adminNote = $event->metode_pembayaran === 'online_banking' ? 'Sudah termasuk admin 3%' : null;
     @endphp
 
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-8 fade-up">
@@ -115,18 +121,31 @@
                         <div class="space-y-3 text-sm">
                             <div class="flex justify-between flex-wrap gap-1">
                                 <span class="text-gray-500">Biaya per slot</span>
-                                @if($event->skema_iuran === 'loyalitas')
+                                @if($isCustomEvent)
+                                    <div class="text-right">
+                                        <span class="font-bold text-brand-500 block">Mulai dari Rp {{ number_format($displayPrice, 0, ',', '.') }}</span>
+                                        <span class="text-[9px] text-amber-500 font-medium block mt-0.5">⚡ Harga tergantung role yang dipilih, {{ $adminNote }}</span>
+                                    </div>
+                                @elseif($event->skema_iuran === 'loyalitas')
                                     @php
                                         $baseEst = ($event->slot_max > 0) ? ($event->biaya_total_event / $event->slot_max) : 0;
-                                        $minEst = round($baseEst * 0.70, -2);
-                                        $maxEst = round($baseEst, -2);
+                                        if ($event->metode_pembayaran === 'online_banking') {
+                                            $minEst = round($baseEst * 0.70 * 1.03, -2);
+                                            $maxEst = round($baseEst * 1.03, -2);
+                                        } else {
+                                            $minEst = round($baseEst * 0.70, -2);
+                                            $maxEst = round($baseEst, -2);
+                                        }
                                     @endphp
                                     <div class="text-right">
                                         <span class="font-bold text-brand-500 block">Rp {{ number_format($minEst, 0, ',', '.') }} - Rp {{ number_format($maxEst, 0, ',', '.') }}</span>
-                                        <span class="text-[9px] text-amber-500 font-medium block mt-0.5">⚡ Berdasarkan keaktifan Anda</span>
+                                        <span class="text-[9px] text-amber-500 font-medium block mt-0.5">⚡ Berdasarkan keaktifan Anda{{ $event->metode_pembayaran === 'online_banking' ? ', sudah termasuk admin 3%' : '' }}</span>
                                     </div>
                                 @else
-                                    <span class="font-bold text-brand-500">Rp {{ number_format((float) $event->iuran_per_pemain, 0, ',', '.') }}</span>
+                                    <span class="font-bold text-brand-500">Rp {{ number_format($displayPrice, 0, ',', '.') }}</span>
+                                    @if($adminNote)
+                                        <span class="text-[9px] text-amber-500 font-medium block mt-0.5">⚡ {{ $adminNote }}</span>
+                                    @endif
                                 @endif
                             </div>
                             <div class="flex justify-between">
@@ -141,6 +160,49 @@
                     </div>
                 </div>
 
+                @if($isCustomEvent)
+                    <div class="pro-card p-6">
+                        <div class="flex items-center justify-between mb-4">
+                            <div>
+                                <h3 class="text-base font-semibold text-gray-900">Role Tersedia</h3>
+                                <p class="text-sm text-gray-500">Pilih role yang sesuai saat mendaftar.</p>
+                            </div>
+                            <span class="px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700">Custom Pricing</span>
+                        </div>
+                        <div class="space-y-3">
+                            @foreach($customRoles as $role)
+                                @php
+                                    $rolePrice = (float) $role['price'];
+                                    $roleDisplayPrice = $event->metode_pembayaran === 'online_banking'
+                                        ? (int) round($rolePrice * 1.03)
+                                        : $rolePrice;
+                                @endphp
+                                <div class="rounded-3xl border border-gray-200 bg-gray-50 p-4">
+                                    <div class="flex items-center justify-between gap-3">
+                                        <div>
+                                            <p class="text-sm font-semibold text-gray-900">{{ $role['name'] }}</p>
+                                            <p class="text-xs text-gray-500">
+                                                Slot maksimal {{ $role['slots'] }} · Terisi {{ $role['joined'] ?? 0 }}
+                                            </p>
+                                        </div>
+                                        <div class="text-right">
+                                            <p class="text-sm font-semibold text-brand-600">Rp {{ number_format($roleDisplayPrice, 0, ',', '.') }}</p>
+                                            <p class="text-[11px] text-slate-500">
+                                                @if($role['is_full'])
+                                                    <span class="text-rose-500">Penuh</span>
+                                                @else
+                                                    Sisa {{ $role['slots_left'] }} slot
+                                                @endif
+                                                {{ $event->metode_pembayaran === 'online_banking' ? '(sudah termasuk admin)' : '' }}
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            @endforeach
+                        </div>
+                    </div>
+                @endif
+
                 {{-- Registration Form --}}
                 @if(!$isFull)
                 <div class="pro-card p-6 lg:hidden">
@@ -153,6 +215,21 @@
 
                     <form action="{{ route('player.join.store', $event->slug) }}" method="POST" class="space-y-4">
                         @csrf
+                        @if($isCustomEvent)
+                            <div>
+                                <label for="role_mobile" class="block text-sm font-medium text-gray-700 mb-1.5">Pilih Role</label>
+                                <select id="role_mobile" name="role_name" required
+                                        class="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm focus:border-brand-500 focus:ring-2 focus:ring-brand-500/10 bg-white">
+                                    <option value="">Pilih role...</option>
+                                    @foreach($customRoles as $role)
+                                        <option value="{{ $role['name'] }}" {{ old('role_name') === $role['name'] ? 'selected' : '' }} @if(!empty($role['is_full'])) disabled @endif>
+                                            {{ $role['name'] }} — Rp {{ number_format((float) $role['price'], 0, ',', '.') }} ({{ $role['slots'] }} slot) @if(!empty($role['is_full'])) - Penuh @endif
+                                        </option>
+                                    @endforeach
+                                </select>
+                                @error('role_name')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror
+                            </div>
+                        @endif
                         <div>
                             <label for="nama_mobile" class="block text-sm font-medium text-gray-700 mb-1.5">Nama Lengkap</label>
                             <input id="nama_mobile" name="nama" type="text" required value="{{ old('nama') }}" placeholder="Masukkan nama sesuai KTP"
@@ -183,7 +260,7 @@
                         <p class="text-2xl font-bold text-gray-900"><span class="text-brand-500">{{ $slotsLeft }}</span>/{{ $event->slot_max }}</p>
                     </div>
                     <div class="w-full bg-gray-100 rounded-full h-2 overflow-hidden mb-4">
-                        <div class="h-full rounded-full transition-all duration-500 {{ $isFull ? 'bg-rose-500' : 'bg-lime-400' }}" style="width:{{ $slotPercentage }}%"></div>
+                        <div class="h-full rounded-full transition-all duration-500 {{ $isFull ? 'bg-rose-500' : 'bg-lime-400' }}" style="width: {{ $slotPercentage }}%;"></div>
                     </div>
 
                     @if($isFull)
@@ -198,12 +275,28 @@
                             @endif
                             <form action="{{ route('player.join.store', $event->slug) }}" method="POST" class="space-y-3">
                                 @csrf
+                                @if($isCustomEvent)
+                                    <div>
+                                        <label for="role_desktop" class="block text-sm font-medium text-gray-700 mb-1.5">Pilih Role</label>
+                                        <select id="role_desktop" name="role_name" required
+                                                class="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm focus:border-brand-500 focus:ring-2 focus:ring-brand-500/10 bg-white">
+                                            <option value="">Pilih role...</option>
+                                            @foreach($customRoles as $role)
+                                                <option value="{{ $role['name'] }}" {{ old('role_name') === $role['name'] ? 'selected' : '' }} @if(!empty($role['is_full'])) disabled @endif>
+                                                    {{ $role['name'] }} — Rp {{ number_format((float) $role['price'], 0, ',', '.') }} ({{ $role['slots'] }} slot) @if(!empty($role['is_full'])) - Penuh @endif
+                                                </option>
+                                            @endforeach
+                                        </select>
+                                        @error('role_name')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror
+                                    </div>
+                                @endif
                                 <input name="nama" type="text" required value="{{ old('nama') }}" placeholder="Nama lengkap"
                                        class="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm focus:border-brand-500 focus:ring-2 focus:ring-brand-500/10">
                                 @error('nama')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror
                                 <input name="kontak" type="text" required value="{{ old('kontak') }}" placeholder="No. WhatsApp"
                                        class="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm focus:border-brand-500 focus:ring-2 focus:ring-brand-500/10">
                                 @error('kontak')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror
+                                <p class="text-[10px] text-slate-500 mt-2">Pembayaran melalui Midtrans QRIS, jumlah yang tertera sudah termasuk admin.</p>
                                 <button type="submit" class="w-full py-3 rounded-xl bg-lime-400 hover:bg-lime-500 text-brand-900 font-bold text-sm transition-all shadow-lg shadow-lime-400/20 flex items-center justify-center gap-2">
                                     Gabung Sekarang
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
@@ -220,29 +313,82 @@
                     <div class="flex items-center justify-between mb-4">
                         <h3 class="text-base font-semibold text-gray-900">Roster ({{ $joinedCount }})</h3>
                     </div>
-                    @if($joinedPlayers->isEmpty())
-                        <p class="text-xs text-gray-400 text-center py-4">Belum ada pemain. Jadilah yang pertama!</p>
-                    @else
-                        <div class="space-y-3 max-h-60 overflow-y-auto pr-1">
-                            @foreach($joinedPlayers as $player)
-                                <div class="flex items-center justify-between">
-                                    <div class="flex items-center gap-3">
-                                        <div class="w-9 h-9 rounded-full bg-brand-50 flex items-center justify-center text-brand-600 text-xs font-bold">
-                                            {{ strtoupper(substr($player->nama, 0, 2)) }}
+
+                    @if($isCustomEvent)
+                        @if(collect($customRoles)->isEmpty())
+                            <p class="text-xs text-gray-400 text-center py-4">Belum ada role yang ditentukan.</p>
+                        @elseif($joinedPlayers->isEmpty())
+                            <p class="text-xs text-gray-400 text-center py-4">Belum ada pemain. Jadilah yang pertama!</p>
+                        @else
+                            <div class="space-y-4 max-h-80 overflow-y-auto pr-1">
+                                @foreach($customRoles as $role)
+                                    @php
+                                        $playersInRole = $joinedPlayers->get($role['name'], collect());
+                                    @endphp
+                                    <div class="rounded-3xl border border-gray-200 bg-slate-50 p-4">
+                                        <div class="flex items-center justify-between gap-3 mb-3">
+                                            <div>
+                                                <p class="text-sm font-semibold text-gray-900">{{ $role['name'] }}</p>
+                                                <p class="text-xs text-gray-500">{{ $playersInRole->count() }} / {{ $role['slots'] }} terisi</p>
+                                            </div>
+                                            <span class="text-[11px] font-semibold {{ !empty($role['is_full']) ? 'text-rose-600' : 'text-emerald-600' }}">
+                                                {{ !empty($role['is_full']) ? 'Penuh' : 'Sisa '.$role['slots_left'].' slot' }}
+                                            </span>
                                         </div>
-                                        <div>
-                                            <p class="text-sm font-semibold text-gray-800">{{ $player->nama }}</p>
-                                            @if($event->show_joined_player_contacts_public)
-                                                <p class="text-xs text-gray-400">{{ $player->kontak }}</p>
-                                            @endif
-                                        </div>
+
+                                        @if($playersInRole->isEmpty())
+                                            <p class="text-xs text-gray-500">Belum ada pemain untuk role ini.</p>
+                                        @else
+                                            <div class="space-y-3">
+                                                @foreach($playersInRole as $player)
+                                                    <div class="flex items-center justify-between">
+                                                        <div class="flex items-center gap-3">
+                                                            <div class="w-9 h-9 rounded-full bg-brand-50 flex items-center justify-center text-brand-600 text-xs font-bold">
+                                                                {{ strtoupper(substr($player->nama, 0, 2)) }}
+                                                            </div>
+                                                            <div>
+                                                                <p class="text-sm font-semibold text-gray-800">{{ $player->nama }}</p>
+                                                                @if($event->show_joined_player_contacts_public)
+                                                                    <p class="text-xs text-gray-400">{{ $player->kontak }}</p>
+                                                                @endif
+                                                            </div>
+                                                        </div>
+                                                        @if($player->pivot && $player->pivot->payment_status === 'paid')
+                                                            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-lime-400 text-brand-900 uppercase tracking-wider">Lunas</span>
+                                                        @endif
+                                                    </div>
+                                                @endforeach
+                                            </div>
+                                        @endif
                                     </div>
-                                    @if($player->pivot && $player->pivot->payment_status === 'paid')
-                                        <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-lime-400 text-brand-900 uppercase tracking-wider">Lunas</span>
-                                    @endif
-                                </div>
-                            @endforeach
-                        </div>
+                                @endforeach
+                            </div>
+                        @endif
+                    @else
+                        @if($joinedPlayers->isEmpty())
+                            <p class="text-xs text-gray-400 text-center py-4">Belum ada pemain. Jadilah yang pertama!</p>
+                        @else
+                            <div class="space-y-3 max-h-60 overflow-y-auto pr-1">
+                                @foreach($joinedPlayers as $player)
+                                    <div class="flex items-center justify-between">
+                                        <div class="flex items-center gap-3">
+                                            <div class="w-9 h-9 rounded-full bg-brand-50 flex items-center justify-center text-brand-600 text-xs font-bold">
+                                                {{ strtoupper(substr($player->nama, 0, 2)) }}
+                                            </div>
+                                            <div>
+                                                <p class="text-sm font-semibold text-gray-800">{{ $player->nama }}</p>
+                                                @if($event->show_joined_player_contacts_public)
+                                                    <p class="text-xs text-gray-400">{{ $player->kontak }}</p>
+                                                @endif
+                                            </div>
+                                        </div>
+                                        @if($player->pivot && $player->pivot->payment_status === 'paid')
+                                            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-lime-400 text-brand-900 uppercase tracking-wider">Lunas</span>
+                                        @endif
+                                    </div>
+                                @endforeach
+                            </div>
+                        @endif
                     @endif
                 </div>
                 @endif

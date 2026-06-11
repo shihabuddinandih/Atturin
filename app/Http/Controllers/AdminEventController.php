@@ -38,10 +38,14 @@ class AdminEventController extends Controller
             'tanggal' => 'required|date',
             'waktu' => 'required',
             'tempat' => 'required|string|max:255',
-            'slot_max' => 'required|integer|min:1',
-            'metode_pembayaran' => 'required|in:online_banking,tunai',
-            'biaya_total_event' => 'required|numeric|min:0',
-            'skema_iuran' => 'required|in:flat,loyalitas',
+            'slot_max' => 'required_if:skema_iuran,flat|integer|min:1',
+            'metode_pembayaran' => 'required|in:online_banking',
+            'biaya_total_event' => 'required_if:skema_iuran,flat|numeric|min:0',
+            'skema_iuran' => 'required|in:flat,custom',
+            'roles' => 'required_if:skema_iuran,custom|array|min:1',
+            'roles.*.name' => 'required_if:skema_iuran,custom|string|max:255',
+            'roles.*.slots' => 'required_if:skema_iuran,custom|integer|min:1',
+            'roles.*.price' => 'required_if:skema_iuran,custom|numeric|min:0',
             'show_joined_players_public' => 'nullable|boolean',
             'show_joined_player_contacts_public' => 'nullable|boolean',
         ]);
@@ -55,9 +59,22 @@ class AdminEventController extends Controller
 
         $validated['admin_id'] = auth()->id();
 
+        if ($validated['skema_iuran'] === 'custom') {
+            $roles = array_values(array_filter($validated['roles'], function ($role) {
+                return isset($role['name']) && trim($role['name']) !== '';
+            }));
+
+            $totalSlots = array_sum(array_column($roles, 'slots'));
+            $validated['slot_max'] = max(1, $totalSlots);
+            $validated['roles'] = $roles;
+            $validated['biaya_total_event'] = array_sum(array_map(function ($role) {
+                return ((float) $role['price']) * ((int) $role['slots']);
+            }, $roles));
+        }
+
         // Calculate iuran_per_pemain for both schemes
-        $validated['iuran_per_pemain'] = $validated['slot_max'] > 0 
-            ? round(($validated['biaya_total_event'] ?? 0) / $validated['slot_max'], -2) 
+        $validated['iuran_per_pemain'] = $validated['slot_max'] > 0
+            ? round(($validated['biaya_total_event'] ?? 0) / $validated['slot_max'], -2)
             : 0;
 
         Event::create($validated);

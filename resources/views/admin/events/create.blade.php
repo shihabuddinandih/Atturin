@@ -27,24 +27,7 @@
                 </div>
 
                 <div class="space-y-4">
-                    {{-- Quick Sport Template Buttons --}}
-                    <div>
-                        <span class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Pilihan Cepat Kategori Olahraga</span>
-                        <div class="flex flex-wrap gap-2">
-                            <button type="button" onclick="applySportTemplate('Futsal', 15, 'Arena Futsal Center')" class="px-3.5 py-1.5 rounded-xl border border-gray-200 text-xs font-semibold text-gray-700 bg-white hover:border-brand-500 hover:text-brand-600 hover:bg-brand-50/20 transition-all flex items-center gap-1.5 shadow-sm">
-                                ⚽ Futsal (15 Slot)
-                            </button>
-                            <button type="button" onclick="applySportTemplate('Badminton', 8, 'GOR Bulutangkis')" class="px-3.5 py-1.5 rounded-xl border border-gray-200 text-xs font-semibold text-gray-700 bg-white hover:border-brand-500 hover:text-brand-600 hover:bg-brand-50/20 transition-all flex items-center gap-1.5 shadow-sm">
-                                🏸 Badminton (8 Slot)
-                            </button>
-                            <button type="button" onclick="applySportTemplate('Mini Soccer', 22, 'Mini Soccer Arena')" class="px-3.5 py-1.5 rounded-xl border border-gray-200 text-xs font-semibold text-gray-700 bg-white hover:border-brand-500 hover:text-brand-600 hover:bg-brand-50/20 transition-all flex items-center gap-1.5 shadow-sm">
-                                🥅 Mini Soccer (22 Slot)
-                            </button>
-                            <button type="button" onclick="applySportTemplate('Basket', 10, 'Basketball Court')" class="px-3.5 py-1.5 rounded-xl border border-gray-200 text-xs font-semibold text-gray-700 bg-white hover:border-brand-500 hover:text-brand-600 hover:bg-brand-50/20 transition-all flex items-center gap-1.5 shadow-sm">
-                                🏀 Basket (10 Slot)
-                            </button>
-                        </div>
-                    </div>
+                    {{-- Quick Sport Template removed: use manual inputs only --}}
 
                     <div>
                         <label for="nama_event" class="block text-sm font-medium text-gray-700 mb-1.5">Nama Event</label>
@@ -78,7 +61,7 @@
                                required placeholder="Cth: Arena Sport Center">
                     </div>
 
-                    <div>
+                    <div id="slot-max-field">
                         <label for="slot_max" class="block text-sm font-medium text-gray-700 mb-1.5">Maksimal Slot Peserta</label>
                         <input type="number" name="slot_max" id="slot_max" min="1" value="{{ old('slot_max') }}"
                                class="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-gray-800 placeholder-gray-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/10 transition-all"
@@ -97,44 +80,93 @@
                 </div>
 
                 <div class="space-y-4">
-                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                        <div>
-                            <label for="skema_iuran" class="block text-sm font-medium text-gray-700 mb-1.5">Skema Pembagian Iuran</label>
-                            <select name="skema_iuran" id="skema_iuran"
-                                    class="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-gray-800 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/10 transition-all" required>
-                                <option value="flat" {{ old('skema_iuran', 'flat') === 'flat' ? 'selected' : '' }}>Bagi Rata (Flat Split)</option>
-                                <option value="loyalitas" {{ old('skema_iuran') === 'loyalitas' ? 'selected' : '' }}>Subsidi Silang Loyalitas (Loyalty Split)</option>
-                            </select>
-                        </div>
-
-                        <div>
-                            <div id="container-metode-pembayaran">
-                                <label for="metode_pembayaran" class="block text-sm font-medium text-gray-700 mb-1.5">Metode Pembayaran</label>
-                                <select name="metode_pembayaran" id="metode_pembayaran"
-                                        class="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-gray-800 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/10 transition-all" required>
-                                    <option value="tunai" {{ old('metode_pembayaran', 'tunai') === 'tunai' ? 'selected' : '' }}>Tunai</option>
-                                    <option value="online_banking" {{ old('metode_pembayaran') === 'online_banking' ? 'selected' : '' }}>Online Banking (Simulasi Midtrans)</option>
-                                </select>
+                    <div class="grid grid-cols-1 xl:grid-cols-[2fr_1fr] gap-6">
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1.5">Mode Pembagian Iuran</label>
+                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    <label class="mode-option flex items-center gap-3 rounded-xl border border-gray-200 p-4 cursor-pointer hover:border-brand-500 transition-all" data-mode="flat">
+                                        <input type="radio" name="skema_iuran" value="flat" class="h-4 w-4 text-brand-500" {{ old('skema_iuran', 'flat') === 'flat' ? 'checked' : '' }}>
+                                        <div>
+                                            <div class="text-sm font-semibold text-gray-900">Mode Default</div>
+                                            <div class="text-xs text-gray-500">Bagi rata, cocok untuk event umum.</div>
+                                        </div>
+                                    </label>
+                                    <label class="mode-option flex items-center gap-3 rounded-xl border border-gray-200 p-4 cursor-pointer hover:border-brand-500 transition-all" data-mode="custom">
+                                        <input type="radio" name="skema_iuran" value="custom" class="h-4 w-4 text-brand-500" {{ old('skema_iuran') === 'custom' ? 'checked' : '' }}>
+                                        <div>
+                                            <div class="text-sm font-semibold text-gray-900">Mode Custom</div>
+                                            <div class="text-xs text-gray-500">Peran slot dan harga berdasar role.</div>
+                                        </div>
+                                    </label>
+                                </div>
                             </div>
-                            <div id="container-gratis-badge" class="hidden">
-                                <label class="block text-sm font-medium text-gray-700 mb-1.5">Metode Pembayaran</label>
-                                <div class="px-4 py-3 rounded-xl border border-lime-200 bg-lime-50 text-brand-900 font-bold text-xs flex items-center gap-1.5 shadow-sm">
-                                    🎁 Gratis (Tanpa Pembayaran)
+
+                            <div id="default-mode-settings" class="space-y-3">
+                                <div>
+                                    <label for="biaya_total_event" class="block text-sm font-medium text-gray-700 mb-1.5">Total Biaya Event (Rp)</label>
+                                    <input type="number" name="biaya_total_event" id="biaya_total_event" min="0" step="any" value="{{ old('biaya_total_event', 0) }}"
+                                           class="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-gray-800 placeholder-gray-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/10 transition-all"
+                                           placeholder="Contoh: 300000">
+                                    <p id="biaya-terbaca" class="text-xs text-brand-600 mt-1.5 font-semibold"></p>
+                                </div>
+                            </div>
+
+                            <div id="custom-mode-settings" class="hidden space-y-4">
+                                <div class="rounded-3xl border border-gray-200 bg-white p-4 shadow-sm">
+                                    <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                                        <div>
+                                            <p class="text-sm font-semibold text-gray-900">Role Custom</p>
+                                            <p class="text-xs text-gray-500">Total biaya event dihitung otomatis dari setiap role.</p>
+                                        </div>
+                                        <button type="button" id="add-role-button" class="inline-flex items-center gap-2 rounded-xl border border-brand-500 bg-brand-50 px-3 py-2 text-xs font-semibold text-brand-700 hover:bg-brand-100 transition-all">
+                                            + Tambah Role
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="grid grid-cols-1 sm:grid-cols-[2fr_1fr_1fr_0.8fr] gap-3 px-3 py-2 text-xs uppercase tracking-wide text-gray-500 border border-gray-200 rounded-xl bg-gray-50">
+                                    <span>Nama Role</span>
+                                    <span>Slot Maksimal</span>
+                                    <span>Harga / Slot</span>
+                                    <span class="sr-only">Aksi</span>
+                                </div>
+                                <div id="custom-roles-list" class="space-y-3"></div>
+                                <div class="rounded-3xl border border-gray-200 bg-brand-50/60 p-4 text-sm text-gray-700">
+                                    <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                                        <div>
+                                            <p class="text-xs uppercase tracking-wide text-slate-500">Ringkasan Role</p>
+                                            <p class="text-sm font-semibold text-gray-900">Total peran dan slot</p>
+                                        </div>
+                                        <div class="grid grid-cols-2 gap-4 text-sm">
+                                            <div class="rounded-xl bg-white p-3 border border-gray-200">
+                                                <p class="text-xs text-gray-500">Total slot</p>
+                                                <p id="custom-total-slots" class="font-semibold text-gray-900">0</p>
+                                            </div>
+                                            <div class="rounded-xl bg-white p-3 border border-gray-200">
+                                                <p class="text-xs text-gray-500">Total biaya</p>
+                                                <p id="custom-total-cost" class="font-semibold text-gray-900">Rp 0</p>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
 
-                        {{-- Input: Total Cost (Used for both schemes) --}}
-                        <div id="container-biaya-total">
-                            <label for="biaya_total_event" class="block text-sm font-medium text-gray-700 mb-1.5">Total Biaya Event (Rp)</label>
-                            <input type="number" name="biaya_total_event" id="biaya_total_event" min="0" step="1000" value="{{ old('biaya_total_event', 0) }}"
-                                   class="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-gray-800 placeholder-gray-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/10 transition-all"
-                                   placeholder="Contoh: 300000" required>
-                            <p id="biaya-terbaca" class="text-xs text-brand-600 mt-1.5 font-semibold"></p>
+                        <div class="space-y-4">
+                            <div id="container-metode-pembayaran" class="rounded-3xl border border-gray-200 bg-blue-50 p-4 shadow-sm">
+                                <label class="block text-sm font-medium text-gray-700 mb-1.5">Metode Pembayaran</label>
+                                <input type="hidden" name="metode_pembayaran" value="online_banking">
+                                <div class="rounded-xl border border-blue-100 bg-blue-100/80 px-4 py-3 text-sm text-blue-900 font-semibold">
+                                    Online Banking (Midtrans QRIS)
+                                </div>
+                            </div>
+                            <div id="container-gratis-badge" class="hidden rounded-3xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700">
+                                <div class="font-semibold text-emerald-800">Gratis</div>
+                                <p class="mt-1 text-xs text-emerald-700">Total biaya diatur Rp 0. Peserta dapat mendaftar tanpa pembayaran.</p>
+                            </div>
                         </div>
                     </div>
 
-                    {{-- Live dynamic preview container for Flat Split --}}
                     <div id="flat-simulator-box" class="p-4 rounded-xl border border-brand-100 bg-brand-50/20 space-y-3 hidden">
                         <div class="flex items-center gap-1.5 text-xs font-semibold text-brand-600">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
@@ -146,37 +178,6 @@
                         <div class="p-3 bg-white border border-gray-100 rounded-lg max-w-xs">
                             <span class="block font-semibold text-gray-700">Iuran Flat / Orang</span>
                             <span class="block font-bold text-brand-600 mt-1 text-lg" id="sim-flat-player">Rp -</span>
-                        </div>
-                    </div>
-
-                    {{-- Live dynamic preview container for Loyalty Split --}}
-                    <div id="loyalty-simulator-box" class="p-4 rounded-xl border border-brand-100 bg-brand-50/20 space-y-3 hidden">
-                        <div class="flex items-center gap-1.5 text-xs font-semibold text-brand-600">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
-                            Kalkulator Estimasi Tarif Dinamis (Subsidi Silang)
-                        </div>
-                        <p class="text-xs text-gray-500 leading-relaxed">
-                            Logika pembagian biaya akan membagi nominal secara otomatis berdasarkan tingkat kehadiran pendaftar dalam event Anda. Peserta yang rajin mendaftar akan mendapat harga lebih murah sebagai penghargaan loyalitas.
-                        </p>
-                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1 text-xs">
-                            <div class="p-3 bg-white border border-gray-100 rounded-lg">
-                                <span class="block font-semibold text-gray-700">Peserta Baru</span>
-                                <span class="block text-[10px] text-gray-400 mt-0.5">Kehadiran: 0 - 2 kali (Bobot 100%)</span>
-                                <span class="block font-bold text-gray-900 mt-1" id="sim-new-player">Rp -</span>
-                            </div>
-                            <div class="p-3 bg-white border border-gray-100 rounded-lg">
-                                <span class="block font-semibold text-sky-700">Peserta Cukup Aktif</span>
-                                <span class="block text-[10px] text-gray-400 mt-0.5">Kehadiran: 3 - 5 kali (Diskon 15%)</span>
-                                <span class="block font-bold text-sky-600 mt-1" id="sim-active-player">Rp -</span>
-                            </div>
-                            <div class="p-3 bg-white border border-gray-100 rounded-lg">
-                                <span class="block font-semibold text-emerald-700">Peserta Sangat Loyal</span>
-                                <span class="block text-[10px] text-gray-400 mt-0.5">Kehadiran: >= 6 kali (Diskon 30%)</span>
-                                <span class="block font-bold text-emerald-600 mt-1" id="sim-loyal-player">Rp -</span>
-                            </div>
-                        </div>
-                        <div class="text-[10px] text-amber-600 font-medium">
-                            * Catatan: Tarif di atas disimulasikan dengan asumsi seluruh kuota penuh dan bobot disebar rata. Saat pendaftaran berlangsung, sistem akan mengkalkulasikan harga final secara instan dan real-time sesuai nomor kontak telepon pendaftar.
                         </div>
                     </div>
                 </div>
@@ -234,21 +235,6 @@
 
 @push('scripts')
 <script>
-    // 1. Quick Sport Template Function
-    window.applySportTemplate = function(sport, slots, venue) {
-        const nameInput = document.getElementById('nama_event');
-        const slotsInput = document.getElementById('slot_max');
-        const venueInput = document.getElementById('tempat');
-
-        if (nameInput) nameInput.value = 'Friendly Match ' + sport + ' Weekend';
-        if (slotsInput) {
-            slotsInput.value = slots;
-            // Fire input event to trigger loyalty preview calculation
-            slotsInput.dispatchEvent(new Event('input'));
-        }
-        if (venueInput) venueInput.value = venue;
-    };
-
     (function () {
         // Elements for visibilitas public toggles
         const playersToggle = document.getElementById('show_joined_players_public');
@@ -272,38 +258,66 @@
             dateInput.setAttribute('min', today);
         }
 
-        // 3. Skema Iuran dynamic UI toggles
-        const skemaSelect = document.getElementById('skema_iuran');
-        const simulatorBoxLoyalitas = document.getElementById('loyalty-simulator-box');
+        const modeInputFlat = document.querySelector('input[name="skema_iuran"][value="flat"]');
+        const modeInputCustom = document.querySelector('input[name="skema_iuran"][value="custom"]');
+        const flatSettings = document.getElementById('default-mode-settings');
+        const customSettings = document.getElementById('custom-mode-settings');
+        const customRolesList = document.getElementById('custom-roles-list');
+        const addRoleButton = document.getElementById('add-role-button');
+        const customTotalSlots = document.getElementById('custom-total-slots');
+        const customTotalCost = document.getElementById('custom-total-cost');
+
         const simulatorBoxFlat = document.getElementById('flat-simulator-box');
-        
+        const simulatorBoxLoyalitas = document.getElementById('loyalty-simulator-box');
         const biayaInput = document.getElementById('biaya_total_event');
         const slotsInput = document.getElementById('slot_max');
-
+        const slotMaxField = document.getElementById('slot-max-field');
         const biayaMask = document.getElementById('biaya-terbaca');
-
         const payMethodContainer = document.getElementById('container-metode-pembayaran');
         const gratisBadgeContainer = document.getElementById('container-gratis-badge');
 
-        function handleSkemaChange() {
-            const val = skemaSelect.value;
-            if (val === 'flat') {
-                if(simulatorBoxFlat) simulatorBoxFlat.classList.remove('hidden');
-                if(simulatorBoxLoyalitas) simulatorBoxLoyalitas.classList.add('hidden');
-            } else {
-                if(simulatorBoxFlat) simulatorBoxFlat.classList.add('hidden');
-                if(simulatorBoxLoyalitas) simulatorBoxLoyalitas.classList.remove('hidden');
-            }
-            runSimulation();
-            syncPaymentMethodVisibility();
+        const existingRoles = @json(old('roles', []));
+
+        function formatRupiah(value) {
+            return 'Rp ' + Math.round(value).toLocaleString('id-ID');
         }
 
-        // 4. Rupiah Masking and Payment Visibility Handlers
+        const modeLabels = document.querySelectorAll('.mode-option');
+
+        function updateModeLabels() {
+            modeLabels.forEach((label) => {
+                const radio = label.querySelector('input[type="radio"]');
+                if (radio && radio.checked) {
+                    label.classList.add('border-brand-500', 'bg-brand-50', 'shadow-sm');
+                } else {
+                    label.classList.remove('border-brand-500', 'bg-brand-50', 'shadow-sm');
+                }
+            });
+        }
+
+        function updateModeSettings() {
+            const isCustom = modeInputCustom && modeInputCustom.checked;
+            flatSettings.classList.toggle('hidden', isCustom);
+            customSettings.classList.toggle('hidden', !isCustom);
+            if (slotMaxField) {
+                slotMaxField.classList.toggle('hidden', isCustom);
+                if (slotsInput) {
+                    slotsInput.required = !isCustom;
+                    slotsInput.disabled = isCustom;
+                }
+            }
+            simulatorBoxFlat.classList.toggle('hidden', isCustom);
+            biayaMask.classList.toggle('hidden', isCustom);
+            if (!isCustom) {
+                simulatorBoxLoyalitas.classList.add('hidden');
+            }
+            updateModeLabels();
+        }
+
         function syncPaymentMethodVisibility() {
             const totalCost = parseFloat(biayaInput.value) || 0;
-            const isFree = (totalCost === 0);
+            const isFree = totalCost === 0;
             updateMaskLabel(biayaInput, biayaMask);
-
             if (isFree) {
                 payMethodContainer.classList.add('hidden');
                 gratisBadgeContainer.classList.remove('hidden');
@@ -316,7 +330,7 @@
         function updateMaskLabel(inputEl, labelEl) {
             const price = parseFloat(inputEl.value) || 0;
             if (price > 0) {
-                labelEl.innerText = 'Terbaca: Rp ' + Math.round(price).toLocaleString('id-ID');
+                labelEl.innerText = 'Terbaca: ' + formatRupiah(price);
                 labelEl.classList.remove('text-gray-400');
                 labelEl.classList.add('text-brand-600');
             } else {
@@ -326,54 +340,98 @@
             }
         }
 
-        // 5. Live Dynamic Loyalty Fee Simulator
-        function runSimulation() {
-            const cost = parseFloat(biayaInput.value) || 0;
-            const slots = parseInt(slotsInput.value) || 0;
-            
-            const formatRupiah = (val) => 'Rp ' + Math.round(val).toLocaleString('id-ID');
+        function createRoleRow(role = {}) {
+            const index = customRolesList.children.length;
+            const row = document.createElement('div');
+            row.className = 'grid grid-cols-1 sm:grid-cols-[1.5fr_1fr_1fr_0.7fr] gap-3 items-end rounded-xl border border-gray-200 bg-white p-4';
+            row.innerHTML = `
+                <div>
+                    <label class="block text-xs font-semibold text-gray-700 mb-1">Nama Role</label>
+                    <input type="text" name="roles[${index}][name]" value="${role.name ?? ''}" class="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm text-gray-800 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/10" placeholder="Contoh: Pemain">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-700 mb-1">Slot Maksimal</label>
+                    <input type="number" name="roles[${index}][slots]" value="${role.slots ?? 0}" min="1" class="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm text-gray-800 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/10" placeholder="0">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-700 mb-1">Harga per Slot (Rp)</label>
+                    <input type="number" name="roles[${index}][price]" value="${role.price ?? 0}" min="0" step="any" class="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm text-gray-800 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/10" placeholder="0">
+                </div>
+                <div class="flex items-center justify-end">
+                    <button type="button" class="remove-role-button inline-flex items-center justify-center rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700 hover:bg-red-100 transition-all">
+                        Hapus
+                    </button>
+                </div>
+            `;
+            customRolesList.appendChild(row);
+            row.querySelector('.remove-role-button')?.addEventListener('click', () => {
+                row.remove();
+                refreshRoleInputs();
+                refreshCustomTotals();
+            });
+            row.querySelector(`input[name="roles[${index}][slots]"]`)?.addEventListener('input', refreshCustomTotals);
+            row.querySelector(`input[name="roles[${index}][price]"]`)?.addEventListener('input', refreshCustomTotals);
+            refreshCustomTotals();
+        }
 
-            if (cost > 0 && slots > 0) {
-                const base = cost / slots;
-                
-                // Loyalty
-                const elNew = document.getElementById('sim-new-player');
-                const elActive = document.getElementById('sim-active-player');
-                const elLoyal = document.getElementById('sim-loyal-player');
-                if(elNew) elNew.innerText = formatRupiah(base);
-                if(elActive) elActive.innerText = formatRupiah(base * 0.85);
-                if(elLoyal) elLoyal.innerText = formatRupiah(base * 0.70);
+        function refreshRoleInputs() {
+            [...customRolesList.children].forEach((row, index) => {
+                const inputs = row.querySelectorAll('input');
+                inputs.forEach((input) => {
+                    const name = input.name.replace(/roles\[\d+\]/, `roles[${index}]`);
+                    input.name = name;
+                });
+            });
+        }
 
-                // Flat
-                const elFlat = document.getElementById('sim-flat-player');
-                if(elFlat) elFlat.innerText = formatRupiah(base);
-            } else {
-                const elNew = document.getElementById('sim-new-player');
-                const elActive = document.getElementById('sim-active-player');
-                const elLoyal = document.getElementById('sim-loyal-player');
-                if(elNew) elNew.innerText = 'Rp -';
-                if(elActive) elActive.innerText = 'Rp -';
-                if(elLoyal) elLoyal.innerText = 'Rp -';
+        function refreshCustomTotals() {
+            const rows = [...customRolesList.querySelectorAll('div.grid')];
+            let totalSlots = 0;
+            let totalCost = 0;
+            rows.forEach((row) => {
+                const slots = parseInt(row.querySelector('input[name^="roles"][name$="[slots]"]')?.value) || 0;
+                const price = parseFloat(row.querySelector('input[name^="roles"][name$="[price]"]')?.value) || 0;
+                totalSlots += slots;
+                totalCost += slots * price;
+            });
+            customTotalSlots.innerText = totalSlots;
+            customTotalCost.innerText = formatRupiah(totalCost);
+        }
 
-                const elFlat = document.getElementById('sim-flat-player');
-                if(elFlat) elFlat.innerText = 'Rp -';
+        function renderExistingRoles() {
+            existingRoles.forEach((role) => createRoleRow(role));
+            if (!existingRoles.length) {
+                createRoleRow({ name: '', slots: 0, price: 0 });
             }
         }
 
-        if (skemaSelect) {
-            skemaSelect.addEventListener('change', handleSkemaChange);
-            handleSkemaChange();
+        function runSimulation() {
+            const cost = parseFloat(biayaInput.value) || 0;
+            const slots = parseInt(slotsInput.value) || 0;
+            const format = formatRupiah;
+            if (cost > 0 && slots > 0) {
+                const base = cost / slots;
+                const elFlat = document.getElementById('sim-flat-player');
+                if (elFlat) elFlat.innerText = format(base);
+            } else {
+                const elFlat = document.getElementById('sim-flat-player');
+                if (elFlat) elFlat.innerText = 'Rp -';
+            }
         }
 
-        if (biayaInput) {
-            biayaInput.addEventListener('input', () => {
-                runSimulation();
-                syncPaymentMethodVisibility();
-            });
-        }
-        if (slotsInput) {
-            slotsInput.addEventListener('input', runSimulation);
-        }
+        if (modeInputFlat) modeInputFlat.addEventListener('change', updateModeSettings);
+        if (modeInputCustom) modeInputCustom.addEventListener('change', updateModeSettings);
+        if (addRoleButton) addRoleButton.addEventListener('click', () => createRoleRow({ name: '', slots: 0, price: 0 }));
+        if (biayaInput) biayaInput.addEventListener('input', () => {
+            runSimulation();
+            syncPaymentMethodVisibility();
+        });
+        if (slotsInput) slotsInput.addEventListener('input', runSimulation);
+
+        updateModeSettings();
+        runSimulation();
+        syncPaymentMethodVisibility();
+        renderExistingRoles();
     })();
 </script>
 @endpush

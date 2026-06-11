@@ -6,27 +6,74 @@ use App\Models\Event;
 use App\Models\Player;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Midtrans\Config as MidtransConfig;
 use Midtrans\Snap;
 
 class PlayerJoinController extends Controller
 {
-    public function show($slug)
+    public function show(Request $request, $slug)
     {
         $event = Event::where('slug', $slug)->firstOrFail();
+
+        $pendingCookieName = 'pending_payment_' . $event->id;
+        $pendingJoin = json_decode($request->cookie($pendingCookieName), true);
+
+        if (is_array($pendingJoin)
+            && isset($pendingJoin['event_id'], $pendingJoin['player_id'])
+            && (int) $pendingJoin['event_id'] === (int) $event->id
+        ) {
+            $pendingPlayer = $event->players()->where('players.id', $pendingJoin['player_id'])->first();
+            if ($pendingPlayer && $pendingPlayer->pivot->payment_method === 'online_banking' && $pendingPlayer->pivot->payment_status !== 'paid') {
+                return redirect()->route('player.join.success', $event->slug);
+            }
+        }
 
         $joinedCount = $event->players()->wherePivot('status_join', 'joined')->count();
         $isFull = $joinedCount >= $event->slot_max;
 
+        $rolesWithAvailability = [];
         $joinedPlayers = collect();
-        if ($event->show_joined_players_public) {
+
+        if ($event->skema_iuran === 'custom') {
+            $eventRoles = collect($event->roles ?? []);
+            $joinedByRole = $event->players()
+                ->wherePivot('status_join', 'joined')
+                ->orderBy('event_player.created_at', 'asc')
+                ->get(['players.id', 'players.nama', 'players.kontak', 'event_player.role_name', 'event_player.created_at']);
+
+            $roleCounts = $joinedByRole->groupBy(function ($player) {
+                return $player->pivot->role_name ?? 'Tanpa Role';
+            })->map->count();
+
+            $joinedPlayers = $joinedByRole->groupBy(function ($player) {
+                return $player->pivot->role_name ?? 'Tanpa Role';
+            });
+
+            $rolesWithAvailability = $eventRoles->map(function ($role) use ($roleCounts) {
+                $joinedForRole = $roleCounts[$role['name']] ?? 0;
+                $slots = isset($role['slots']) ? (int) $role['slots'] : 0;
+
+                return array_merge($role, [
+                    'joined' => $joinedForRole,
+                    'slots_left' => max(0, $slots - $joinedForRole),
+                    'is_full' => $slots <= 0 || $joinedForRole >= $slots,
+                ]);
+            })->all();
+
+            if (count($rolesWithAvailability) > 0 && collect($rolesWithAvailability)->every(fn ($role) => $role['is_full'])) {
+                $isFull = true;
+            }
+        }
+
+        if ($event->show_joined_players_public && $event->skema_iuran !== 'custom') {
             $joinedPlayers = $event->players()
                 ->wherePivot('status_join', 'joined')
                 ->orderBy('event_player.created_at', 'asc')
                 ->get(['players.id', 'players.nama', 'players.kontak']);
         }
 
-        return view('player.join.show', compact('event', 'isFull', 'joinedCount', 'joinedPlayers'));
+        return view('player.join.show', compact('event', 'isFull', 'joinedCount', 'joinedPlayers', 'rolesWithAvailability'));
     }
 
     public function store(Request $request, $slug, \App\Services\EventService $eventService)
@@ -38,10 +85,17 @@ class PlayerJoinController extends Controller
             return back()->with('error', 'Maaf, slot pertandingan sudah penuh.');
         }
 
-        $validated = $request->validate([
+        $rules = [
             'nama' => 'required|string|max:255',
             'kontak' => 'required|string|max:255',
-        ]);
+        ];
+
+        if ($event->skema_iuran === 'custom') {
+            $roleNames = array_column($event->roles ?? [], 'name');
+            $rules['role_name'] = ['required', 'string', Rule::in($roleNames)];
+        }
+
+        $validated = $request->validate($rules);
 
         // Cek jika player dengan kontak yang sama sudah join di event ini
         $existingPlayer = $event->players()->where('kontak', $validated['kontak'])->first();
@@ -55,7 +109,37 @@ class PlayerJoinController extends Controller
             ['nama' => $validated['nama']]
         );
 
-        $fee = $eventService->calculateLoyaltyFee($event, $validated['kontak']);
+        // Update nama setiap kali kontak yang sama digunakan dengan nama terbaru
+        if ($player->nama !== $validated['nama']) {
+            $player->update(['nama' => $validated['nama']]);
+        }
+
+        if ($event->skema_iuran === 'custom') {
+            $selectedRole = collect($event->roles ?? [])->firstWhere('name', $validated['role_name']);
+
+            $selectedRoleSlots = isset($selectedRole['slots']) ? (int) $selectedRole['slots'] : 0;
+            $selectedRoleJoinedCount = $event->players()
+                ->wherePivot('status_join', 'joined')
+                ->wherePivot('role_name', $validated['role_name'])
+                ->count();
+
+            if ($selectedRoleSlots > 0 && $selectedRoleJoinedCount >= $selectedRoleSlots) {
+                return back()->withInput()->with('error', "Maaf, slot role {$validated['role_name']} sudah penuh. Silakan pilih role lain.");
+            }
+
+            $baseFee = $selectedRole ? (float) $selectedRole['price'] : (float) $event->iuran_per_pemain;
+        } elseif ($event->skema_iuran === 'loyalitas') {
+            $baseFee = $eventService->calculateLoyaltyFee($event, $validated['kontak']);
+        } else {
+            $baseFee = (float) $event->iuran_per_pemain;
+        }
+
+        $adminFee = 0;
+        if ($event->metode_pembayaran === 'online_banking') {
+            $adminFee = (int) round($baseFee * 0.03);
+        }
+
+        $fee = $baseFee + $adminFee;
 
         // Jika player sudah pernah join dan batal, update statusnya menjadi joined, jika belum attach baru
         $paymentPayload = [
@@ -67,6 +151,10 @@ class PlayerJoinController extends Controller
             'payment_reference' => null,
             'payment_paid_at' => null,
         ];
+
+        if ($event->skema_iuran === 'custom') {
+            $paymentPayload['role_name'] = $validated['role_name'];
+        }
 
         if ($existingPlayer) {
             $event->players()->updateExistingPivot($player->id, $paymentPayload);
@@ -81,7 +169,11 @@ class PlayerJoinController extends Controller
             ],
         ]);
 
-        return redirect()->route('player.join.success', $event->slug);
+        return redirect()->route('player.join.success', $event->slug)
+            ->withCookie(cookie()->forever('pending_payment_' . $event->id, json_encode([
+                'event_id' => $event->id,
+                'player_id' => $player->id,
+            ])));
     }
 
     public function success($slug)
@@ -127,7 +219,8 @@ class PlayerJoinController extends Controller
         }
 
         if ($player->pivot->payment_status === 'paid') {
-            return back()->with('success', 'Pembayaran Anda sudah tercatat sebagai PAID.');
+            return back()->with('success', 'Pembayaran Anda sudah tercatat sebagai PAID.')
+                ->withCookie(cookie()->forget('pending_payment_' . $event->id));
         }
 
         $reference = 'SIM-MIDTRANS-' . strtoupper(Str::random(10));
@@ -203,6 +296,7 @@ class PlayerJoinController extends Controller
                 'first_name' => $player->nama,
                 'phone' => $player->kontak,
             ],
+            'enabled_payments' => ['other_qris'],
         ];
 
         $snapToken = Snap::getSnapToken($params);
@@ -243,6 +337,12 @@ class PlayerJoinController extends Controller
             'payment_paid_at' => $newStatus === 'paid' ? now() : null,
         ]);
 
-        return response()->json(['status' => $newStatus]);
+        $response = response()->json(['status' => $newStatus]);
+
+        if ($newStatus === 'paid') {
+            $response->withCookie(cookie()->forget('pending_payment_' . $event->id));
+        }
+
+        return $response;
     }
 }

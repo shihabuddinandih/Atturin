@@ -25,6 +25,7 @@ class Event extends Model
         'iuran_per_pemain',
         'biaya_total_event',
         'skema_iuran',
+        'roles',
         'show_joined_players_public',
         'show_joined_player_contacts_public',
         'slug',
@@ -38,6 +39,7 @@ class Event extends Model
         'show_joined_players_public' => 'boolean',
         'show_joined_player_contacts_public' => 'boolean',
         'required_fields' => 'array',
+        'roles' => 'array',
         'tanggal' => 'date',
     ];
 
@@ -78,6 +80,7 @@ class Event extends Model
             'hadir',
             'payment_method',
             'payment_amount',
+            'role_name',
             'payment_status',
             'payment_reference',
             'payment_paid_at'
