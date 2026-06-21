@@ -24,7 +24,14 @@ class EventService
                 ['players as total_pembayaran' => function ($query) {
                     $query->where('event_player.payment_status', PaymentStatus::PAID->value);
                 }],
-                'event_player.payment_amount'
+                \Illuminate\Support\Facades\DB::raw(
+                    "CASE
+                        WHEN event_player.payment_method != 'online_banking' THEN event_player.payment_amount
+                        WHEN event_player.payment_amount <= 50500               THEN event_player.payment_amount - 1500
+                        WHEN event_player.payment_amount <= 102000              THEN event_player.payment_amount - 3000
+                        ELSE                                                         event_player.payment_amount / 1.03
+                     END"
+                )
             );
 
         if ($status === 'upcoming') {
@@ -123,9 +130,18 @@ class EventService
         $paidCount = $players->where('payment_status', PaymentStatus::PAID->value)->count();
         $pendingCount = $players->where('payment_status', PaymentStatus::PENDING->value)->count();
         $failedCount = $players->where('payment_status', PaymentStatus::FAILED->value)->count();
+        $baseAmount = function (array $player): float {
+            $amt = (float) $player['payment_amount'];
+            if ($player['payment_method'] !== 'online_banking') {
+                return $amt;
+            }
+            if ($amt <= 50500)  return $amt - 1500;
+            if ($amt <= 102000) return $amt - 3000;
+            return $amt / 1.03;
+        };
         $totalCollected = $players
             ->where('payment_status', PaymentStatus::PAID->value)
-            ->sum(fn($player) => (float) $player['payment_amount']);
+            ->sum(fn($player) => $baseAmount($player));
 
         return [
             'metrics' => [

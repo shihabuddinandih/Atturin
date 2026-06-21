@@ -59,6 +59,20 @@
         $isCustomEvent = $event->skema_iuran === 'custom';
         $rolesWithAvailability = $rolesWithAvailability ?? [];
         $customRoles = count($rolesWithAvailability) ? $rolesWithAvailability : ($event->roles ?? []);
+
+        $computeAdminFee = function (float $base, string $method) {
+            if ($method !== 'online_banking') {
+                return 0.0;
+            }
+            if ($base <= 49000) {
+                return 1500.0;
+            }
+            if ($base <= 99000) {
+                return 3000.0;
+            }
+            return (float) ($base * 0.03);
+        };
+
         // prefer display_price when provided by controller
         if ($isCustomEvent && count($customRoles) > 0) {
             $displayPrices = array_filter(array_map(fn($r) => $r['display_price'] ?? null, $customRoles));
@@ -66,15 +80,30 @@
                 $displayPrice = min($displayPrices);
             } else {
                 $basePrice = min(array_column($customRoles, 'price'));
-                $displayPrice = $event->metode_pembayaran === 'online_banking' ? (int) round($basePrice * 1.03) : $basePrice;
+                $displayPrice = (int) round($basePrice + $computeAdminFee($basePrice, $event->metode_pembayaran));
             }
         } else {
-            $displayPrice = $event->metode_pembayaran === 'online_banking' ? (int) round((float)$event->iuran_per_pemain * 1.03) : (float)$event->iuran_per_pemain;
+            $basePrice = (float) $event->iuran_per_pemain;
+            $displayPrice = (int) round($basePrice + $computeAdminFee($basePrice, $event->metode_pembayaran));
         }
         $adminNote = $event->metode_pembayaran === 'online_banking' ? 'sudah termasuk biaya admin dan sistem' : null;
     @endphp
 
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-8 fade-up">
+        @if(session('success'))
+            <div class="mb-6 flex items-center gap-3 bg-emerald-50 border border-emerald-200 text-emerald-700 px-4 py-3 rounded-xl text-sm">
+                <svg class="w-5 h-5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
+                {{ session('success') }}
+            </div>
+        @endif
+
+        @if(session('info'))
+            <div class="mb-6 flex items-center gap-3 bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded-xl text-sm">
+                <svg class="w-5 h-5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/></svg>
+                {{ session('info') }}
+            </div>
+        @endif
+
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
             {{-- Left Column: Event Details --}}
@@ -140,8 +169,10 @@
                                     @php
                                         $baseEst = ($event->slot_max > 0) ? ($event->biaya_total_event / $event->slot_max) : 0;
                                         if ($event->metode_pembayaran === 'online_banking') {
-                                            $minEst = round($baseEst * 0.70 * 1.03, -2);
-                                            $maxEst = round($baseEst * 1.03, -2);
+                                            $minBase = $baseEst * 0.70;
+                                            $maxBase = $baseEst;
+                                            $minEst = round($minBase + $computeAdminFee($minBase, 'online_banking'), -2);
+                                            $maxEst = round($maxBase + $computeAdminFee($maxBase, 'online_banking'), -2);
                                         } else {
                                             $minEst = round($baseEst * 0.70, -2);
                                             $maxEst = round($baseEst, -2);
@@ -149,7 +180,7 @@
                                     @endphp
                                     <div class="text-right">
                                         <span class="font-bold text-brand-500 block">Rp {{ number_format($minEst, 0, ',', '.') }} - Rp {{ number_format($maxEst, 0, ',', '.') }}</span>
-                                        <span class="text-[9px] text-amber-500 font-medium block mt-0.5">⚡ Berdasarkan keaktifan Anda{{ $event->metode_pembayaran === 'online_banking' ? ', sudah termasuk admin 3%' : '' }}</span>
+                                        <span class="text-[9px] text-amber-500 font-medium block mt-0.5">⚡ Berdasarkan keaktifan Anda{{ $event->metode_pembayaran === 'online_banking' ? ', sudah termasuk biaya admin dan sistem' : '' }}</span>
                                     </div>
                                 @else
                                     <span class="font-bold text-brand-500">Rp {{ number_format($displayPrice, 0, ',', '.') }}</span>
@@ -183,8 +214,8 @@
                             @foreach($customRoles as $role)
                                 @php
                                     $rolePrice = (float) ($role['price'] ?? 0);
-                                    $roleDisplayPrice = $role['display_price'] ?? ($event->metode_pembayaran === 'online_banking' ? (int) round($rolePrice * 1.03) : $rolePrice);
-                                    $roleAdminFee = $role['admin_fee'] ?? ($event->metode_pembayaran === 'online_banking' ? (int) round($rolePrice * 0.03) : 0);
+                                    $roleAdminFee = $role['admin_fee'] ?? $computeAdminFee($rolePrice, $event->metode_pembayaran);
+                                    $roleDisplayPrice = $role['display_price'] ?? ($rolePrice + $roleAdminFee);
                                 @endphp
                                 <div class="rounded-3xl border border-gray-200 bg-gray-50 p-4">
                                     <div class="flex items-center justify-between gap-3">
@@ -234,7 +265,8 @@
                                     <option value="">Pilih role...</option>
                                             @foreach($customRoles as $role)
                                                 @php
-                                                    $optDisplay = $role['display_price'] ?? ( $event->metode_pembayaran === 'online_banking' ? (int) round((float)$role['price'] * 1.03) : (float)$role['price']);
+                                                    $rolePrice = (float) ($role['price'] ?? 0);
+                                                    $optDisplay = $role['display_price'] ?? ($rolePrice + $computeAdminFee($rolePrice, $event->metode_pembayaran));
                                                 @endphp
                                                 <option value="{{ $role['name'] }}" {{ old('role_name') === $role['name'] ? 'selected' : '' }} @if(!empty($role['is_full'])) disabled @endif>
                                                     {{ $role['name'] }} — Rp {{ number_format($optDisplay, 0, ',', '.') }} ({{ $role['slots'] }} slot) @if(!empty($role['is_full'])) - Penuh @endif
@@ -297,7 +329,8 @@
                                             <option value="">Pilih role...</option>
                                             @foreach($customRoles as $role)
                                                 @php
-                                                    $optDisplay = $role['display_price'] ?? ( $event->metode_pembayaran === 'online_banking' ? (int) round((float)$role['price'] * 1.03) : (float)$role['price']);
+                                                    $rolePrice = (float) ($role['price'] ?? 0);
+                                                    $optDisplay = $role['display_price'] ?? ($rolePrice + $computeAdminFee($rolePrice, $event->metode_pembayaran));
                                                 @endphp
                                                 <option value="{{ $role['name'] }}" {{ old('role_name') === $role['name'] ? 'selected' : '' }} @if(!empty($role['is_full'])) disabled @endif>
                                                     {{ $role['name'] }} — Rp {{ number_format($optDisplay, 0, ',', '.') }} ({{ $role['slots'] }} slot) @if(!empty($role['is_full'])) - Penuh @endif

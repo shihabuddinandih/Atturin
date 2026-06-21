@@ -133,7 +133,7 @@
 
             <div class="pro-card p-6">
                 <h3 class="text-base font-semibold text-gray-900">Riwayat Penarikan</h3>
-                <p class="text-sm text-gray-500 mt-1">Lihat status penarikan dan proses demo jika perlu.</p>
+                <p class="text-sm text-gray-500 mt-1">Lihat status pengajuan penarikan dana Anda.</p>
 
                 <div class="mt-5 space-y-4">
                     @forelse($withdrawals as $withdrawal)
@@ -143,18 +143,19 @@
                                     <p class="text-sm font-semibold text-gray-900">Rp {{ number_format($withdrawal->amount, 0, ',', '.') }}</p>
                                     <p class="text-xs text-gray-500 mt-1">{{ $paymentMethodLabels[$withdrawal->payment_method] ?? $withdrawal->payment_method }} • {{ $withdrawal->payment_account }}</p>
                                 </div>
-                                <span class="inline-flex items-center rounded-full bg-gray-100 px-3 py-1 text-[11px] font-semibold uppercase tracking-wider text-gray-600">{{ $withdrawal->status }}</span>
+                                <span class="inline-flex items-center rounded-full bg-gray-100 px-3 py-1 text-[11px] font-semibold uppercase tracking-wider text-gray-600">
+                                    @if($withdrawal->status === 'pending')
+                                        Pending
+                                    @elseif($withdrawal->status === 'completed')
+                                        Sukses
+                                    @else
+                                        Ditolak
+                                    @endif
+                                </span>
                             </div>
 
                             <p class="mt-3 text-[12px] text-gray-500">{{ $withdrawal->note ?? 'Tidak ada catatan.' }}</p>
                             <p class="mt-2 text-[12px] text-gray-400">Diminta {{ $withdrawal->requested_at?->translatedFormat('d M Y H:i') }}</p>
-
-                            @if($withdrawal->status === 'pending')
-                                <form action="{{ route('admin.finances.withdrawals.process', $withdrawal) }}" method="POST" class="mt-4">
-                                    @csrf
-                                    <button type="submit" class="w-full rounded-xl bg-brand-500 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-600">Proses Demo</button>
-                                </form>
-                            @endif
                         </div>
                     @empty
                         <p class="text-sm text-gray-500">Belum ada permintaan penarikan.</p>

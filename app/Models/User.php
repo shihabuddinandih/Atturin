@@ -63,6 +63,9 @@ class User extends Authenticatable
      */
     public function homePath(): string
     {
+        if ($this->role === 'superadmin') {
+            return '/superadmin/withdrawals';
+        }
         return $this->role === 'admin' ? '/admin/dashboard' : '/dashboard';
     }
 

@@ -4,11 +4,13 @@ namespace App\Http\Controllers;
 
 use App\Models\Event;
 use App\Models\Player;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Midtrans\Config as MidtransConfig;
 use Midtrans\Snap;
+use Midtrans\Transaction;
 
 class PlayerJoinController extends Controller
 {
@@ -174,9 +176,9 @@ class PlayerJoinController extends Controller
 
         $fee = $baseFee + $adminFee;
 
-        // Jika player sudah pernah join dan batal, update statusnya menjadi joined, jika belum attach baru
+        // Jika player sudah pernah join dan batal, masih tunggu pembayaran sebelum status jadi joined
         $paymentPayload = [
-            'status_join' => 'joined',
+            'status_join' => 'batal',
             'hadir' => false,
             'payment_method' => $event->metode_pembayaran,
             'payment_amount' => $fee,
@@ -202,14 +204,15 @@ class PlayerJoinController extends Controller
             ],
         ]);
 
+        // set pending cookie to expire in 3 minutes (matching QR expiry)
         return redirect()->route('player.join.success', $event->slug)
-            ->withCookie(cookie()->forever('pending_payment_' . $event->id, json_encode([
+            ->withCookie(cookie('pending_payment_' . $event->id, json_encode([
                 'event_id' => $event->id,
                 'player_id' => $player->id,
-            ])));
+            ]), 3));
     }
 
-    public function success($slug)
+    public function success(Request $request, $slug)
     {
         $event = Event::where('slug', $slug)->firstOrFail();
 
@@ -224,7 +227,106 @@ class PlayerJoinController extends Controller
             $latestJoin = $event->players()->where('players.id', $joinContext['player_id'])->first();
         }
 
+        if (!$latestJoin) {
+            $pendingCookieName = 'pending_payment_' . $event->id;
+            $pendingJoin = json_decode($request->cookie($pendingCookieName), true);
+
+            if (is_array($pendingJoin)
+                && isset($pendingJoin['event_id'], $pendingJoin['player_id'])
+                && (int) $pendingJoin['event_id'] === (int) $event->id
+            ) {
+                $latestJoin = $event->players()->where('players.id', $pendingJoin['player_id'])->first();
+            }
+        }
+
+        if ($latestJoin && $latestJoin->pivot->payment_status === 'pending' && $latestJoin->pivot->payment_reference) {
+            $serverKey = config('services.midtrans.server_key');
+            if ($serverKey) {
+                MidtransConfig::$serverKey = $serverKey;
+                MidtransConfig::$isProduction = (bool) config('services.midtrans.is_production', false);
+                MidtransConfig::$isSanitized = true;
+                MidtransConfig::$is3ds = true;
+
+                try {
+                    $statusResult = Transaction::status($latestJoin->pivot->payment_reference);
+                    $transactionStatus = $statusResult->transaction_status ?? 'pending';
+                    $newStatus = match ($transactionStatus) {
+                        'capture', 'settlement' => 'paid',
+                        'deny', 'cancel', 'expire' => 'failed',
+                        default => 'pending',
+                    };
+
+                    if ($newStatus !== $latestJoin->pivot->payment_status) {
+                        $payload = [
+                            'payment_status' => $newStatus,
+                            'payment_paid_at' => $newStatus === 'paid' ? now() : null,
+                            'payment_expires_at' => $newStatus === 'paid' ? null : $latestJoin->pivot->payment_expires_at,
+                            'payment_snap_token' => $newStatus === 'paid' ? null : $latestJoin->pivot->payment_snap_token,
+                        ];
+
+                        if ($newStatus === 'paid') {
+                            $payload['status_join'] = 'joined';
+                        }
+
+                        $event->players()->updateExistingPivot($latestJoin->id, $payload);
+                        
+                        // Refresh the latestJoin model
+                        $latestJoin = $event->players()->where('players.id', $latestJoin->id)->first();
+                    }
+                } catch (\Exception $e) {
+                    // Ignore errors during automatic check
+                }
+            }
+        }
+
+        if ($latestJoin && $latestJoin->pivot->payment_status === 'paid') {
+            $pendingCookieName = 'pending_payment_' . $event->id;
+            return redirect()->route('player.join.show', $event->slug)
+                ->with('success', 'Pembayaran berhasil! Anda telah bergabung dalam event.')
+                ->withCookie(cookie()->forget($pendingCookieName));
+        }
+
         return view('player.join.success', compact('event', 'latestJoin'));
+    }
+
+    public function cancel(Request $request, $slug)
+    {
+        $event = Event::where('slug', $slug)->firstOrFail();
+
+        $pendingCookieName = 'pending_payment_' . $event->id;
+        $joinContext = session('join_context');
+        $pendingJoin = json_decode($request->cookie($pendingCookieName), true);
+
+        $playerId = null;
+
+        if (
+            is_array($joinContext)
+            && isset($joinContext['event_id'], $joinContext['player_id'])
+            && (int) $joinContext['event_id'] === (int) $event->id
+        ) {
+            $playerId = $joinContext['player_id'];
+        } elseif (
+            is_array($pendingJoin)
+            && isset($pendingJoin['event_id'], $pendingJoin['player_id'])
+            && (int) $pendingJoin['event_id'] === (int) $event->id
+        ) {
+            $playerId = $pendingJoin['player_id'];
+        }
+
+        if ($playerId) {
+            $player = $event->players()->where('players.id', $playerId)->first();
+
+            // Only cancel if payment is still pending — do not cancel a paid registration
+            if ($player && $player->pivot->payment_status !== 'paid') {
+                $event->players()->detach($playerId);
+            }
+        }
+
+        session()->forget('join_context');
+
+        return redirect()->route('player.join.show', $event->slug)
+            ->with('info', 'Pendaftaran berhasil dibatalkan. Anda dapat mendaftar ulang kapan saja.')
+            ->withCookie(cookie()->forget($pendingCookieName));
     }
 
     public function simulateOnlinePayment($slug)
@@ -259,9 +361,11 @@ class PlayerJoinController extends Controller
         $reference = 'SIM-MIDTRANS-' . strtoupper(Str::random(10));
 
         $event->players()->updateExistingPivot($player->id, [
+            'status_join' => 'joined',
             'payment_status' => 'paid',
             'payment_reference' => $reference,
             'payment_paid_at' => now(),
+            'payment_expires_at' => null,
         ]);
 
         return back()->with('success', 'Simulasi pembayaran online berhasil. Status pembayaran Anda sudah PAID.');
@@ -304,13 +408,16 @@ class PlayerJoinController extends Controller
         MidtransConfig::$isSanitized = true;
         MidtransConfig::$is3ds = true;
 
+        $existingRef = $player->pivot->payment_reference;
+        $existingToken = $player->pivot->payment_snap_token;
+        $expiresAt = $player->pivot->payment_expires_at ? Carbon::parse($player->pivot->payment_expires_at) : null;
+
+        if ($player->pivot->payment_status === 'pending' && $existingRef && $existingToken && $expiresAt && $expiresAt->greaterThan(now())) {
+            return response()->json(['token' => $existingToken]);
+        }
+
         $orderId = 'PSH-' . now()->format('YmdHis') . '-' . strtoupper(Str::random(6));
         $grossAmount = (int) $player->pivot->payment_amount;
-
-        $event->players()->updateExistingPivot($player->id, [
-            'payment_reference' => $orderId,
-            'payment_status' => 'pending',
-        ]);
 
         $params = [
             'transaction_details' => [
@@ -330,9 +437,21 @@ class PlayerJoinController extends Controller
                 'phone' => $player->kontak,
             ],
             'enabled_payments' => ['other_qris'],
+            'expiry' => [
+                'start_time' => now()->format('Y-m-d H:i:s O'),
+                'unit' => 'minute',
+                'duration' => 3,
+            ],
         ];
 
         $snapToken = Snap::getSnapToken($params);
+
+        $event->players()->updateExistingPivot($player->id, [
+            'payment_reference' => $orderId,
+            'payment_status' => 'pending',
+            'payment_expires_at' => now()->addMinutes(3),
+            'payment_snap_token' => $snapToken,
+        ]);
 
         return response()->json(['token' => $snapToken]);
     }
@@ -364,16 +483,135 @@ class PlayerJoinController extends Controller
             default => 'pending',
         };
 
-        $event->players()->updateExistingPivot($player->id, [
+        $updatePayload = [
             'payment_status' => $newStatus,
             'payment_reference' => $orderId,
             'payment_paid_at' => $newStatus === 'paid' ? now() : null,
-        ]);
+            'payment_expires_at' => $newStatus === 'paid' ? null : $player->pivot->payment_expires_at,
+            'payment_snap_token' => $newStatus === 'paid' ? null : $player->pivot->payment_snap_token,
+        ];
+
+        if ($newStatus === 'paid') {
+            $updatePayload['status_join'] = 'joined';
+        }
+
+        // If the order id doesn't match the current player's pivot, attempt to find the player by order id
+        $targetPlayer = $player;
+        if ($player->pivot->payment_reference !== $orderId) {
+            $found = $event->players()->wherePivot('payment_reference', $orderId)->first();
+            if ($found) {
+                $targetPlayer = $found;
+            }
+        }
+
+        if (!$targetPlayer) {
+            return response()->json(['message' => 'Pemain untuk order ini tidak ditemukan.'], 404);
+        }
+
+        $event->players()->updateExistingPivot($targetPlayer->id, $updatePayload);
 
         $response = response()->json(['status' => $newStatus]);
 
         if ($newStatus === 'paid') {
+            session()->flash('success', 'Pembayaran berhasil! Anda telah bergabung dalam event.');
             $response->withCookie(cookie()->forget('pending_payment_' . $event->id));
+        }
+
+        return $response;
+    }
+
+    public function midtransStatus(Request $request, $slug)
+    {
+        $event = Event::where('slug', $slug)->firstOrFail();
+        $joinContext = session('join_context');
+        $pendingCookieName = 'pending_payment_' . $event->id;
+        $pendingJoin = json_decode($request->cookie($pendingCookieName), true);
+        $playerIdFromRequest = $request->input('player_id');
+        $paymentReferenceFromRequest = $request->input('payment_reference');
+
+        if (!is_array($joinContext)
+            || !isset($joinContext['event_id'], $joinContext['player_id'])
+            || (int) $joinContext['event_id'] !== (int) $event->id
+        ) {
+            if (is_array($pendingJoin)
+                && isset($pendingJoin['event_id'], $pendingJoin['player_id'])
+                && (int) $pendingJoin['event_id'] === (int) $event->id
+            ) {
+                $joinContext = $pendingJoin;
+            }
+        }
+
+        $player = null;
+        if (is_array($joinContext) && isset($joinContext['player_id'])) {
+            $player = $event->players()->where('players.id', $joinContext['player_id'])->first();
+        }
+
+        if (!$player && $playerIdFromRequest) {
+            $player = $event->players()->where('players.id', $playerIdFromRequest)->first();
+        }
+
+        if (!$player && $paymentReferenceFromRequest) {
+            $player = $event->players()->wherePivot('payment_reference', $paymentReferenceFromRequest)->first();
+        }
+
+        if (!$player) {
+            return response()->json(['message' => 'Data pemain tidak ditemukan.'], 404);
+        }
+
+        if ($player->pivot->payment_method !== 'online_banking') {
+            return response()->json(['message' => 'Metode pembayaran bukan online banking.'], 422);
+        }
+
+        if ($player->pivot->payment_status === 'paid') {
+            return response()->json(['status' => 'paid']);
+        }
+
+        $reference = $player->pivot->payment_reference;
+        if (!$reference) {
+            return response()->json(['message' => 'Order belum dibuat.'], 422);
+        }
+
+        $serverKey = config('services.midtrans.server_key');
+        if (!$serverKey) {
+            return response()->json(['message' => 'Midtrans key belum dikonfigurasi.'], 500);
+        }
+
+        MidtransConfig::$serverKey = $serverKey;
+        MidtransConfig::$isProduction = (bool) config('services.midtrans.is_production', false);
+        MidtransConfig::$isSanitized = true;
+        MidtransConfig::$is3ds = true;
+
+        try {
+            $statusResult = Transaction::status($reference);
+        } catch (\Exception $e) {
+            return response()->json(['message' => 'Gagal memeriksa status pembayaran.', 'error' => $e->getMessage()], 500);
+        }
+
+        $transactionStatus = $statusResult->transaction_status ?? 'pending';
+        $newStatus = match ($transactionStatus) {
+            'capture', 'settlement' => 'paid',
+            'deny', 'cancel', 'expire' => 'failed',
+            default => 'pending',
+        };
+
+        $payload = [
+            'payment_status' => $newStatus,
+            'payment_reference' => $reference,
+            'payment_paid_at' => $newStatus === 'paid' ? now() : null,
+            'payment_expires_at' => $newStatus === 'paid' ? null : $player->pivot->payment_expires_at,
+            'payment_snap_token' => $newStatus === 'paid' ? null : $player->pivot->payment_snap_token,
+        ];
+
+        if ($newStatus === 'paid') {
+            $payload['status_join'] = 'joined';
+        }
+
+        $event->players()->updateExistingPivot($player->id, $payload);
+
+        $response = response()->json(['status' => $newStatus, 'transaction_status' => $transactionStatus]);
+        if ($newStatus === 'paid') {
+            session()->flash('success', 'Pembayaran berhasil! Anda telah bergabung dalam event.');
+            $response->withCookie(cookie()->forget($pendingCookieName));
         }
 
         return $response;

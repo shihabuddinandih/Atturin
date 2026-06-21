@@ -19,10 +19,11 @@ return new class extends Migration
             $table->time('waktu');
             $table->string('tempat');
             $table->integer('slot_max');
-            $table->string('metode_pembayaran')->default('tunai');
+            $table->string('metode_pembayaran')->default('online_banking');
             $table->decimal('iuran_per_pemain', 12, 2)->default(0);
             $table->decimal('biaya_total_event', 15, 2)->nullable();
             $table->string('skema_iuran', 50)->default('flat');
+            $table->json('roles')->nullable();
             $table->boolean('show_joined_players_public')->default(true);
             $table->boolean('show_joined_player_contacts_public')->default(false);
             $table->string('slug')->unique();

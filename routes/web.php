@@ -7,6 +7,7 @@ use App\Http\Controllers\AdminMemberController;
 use App\Http\Controllers\AdminSettingsController;
 use App\Http\Controllers\PlayerJoinController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\SuperAdminWithdrawalController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -16,6 +17,9 @@ use Illuminate\Support\Facades\Route;
 |*/
 
 Route::get('/', function () {
+    if (auth()->check()) {
+        return redirect(auth()->user()->homePath());
+    }
     return redirect()->route('admin.dashboard');
 });
 
@@ -24,7 +28,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
         return redirect()->route('login');
     })->name('login');
 
-    Route::middleware('auth')->group(function () {
+    Route::middleware(['auth', 'admin.only'])->group(function () {
         Route::get('dashboard', [AdminDashboardController::class, 'index'])->name('dashboard');
         Route::get('settings', [AdminSettingsController::class, 'index'])->name('settings.index');
         Route::patch('settings', [AdminSettingsController::class, 'update'])->name('settings.update');
@@ -52,12 +56,20 @@ Route::prefix('admin')->name('admin.')->group(function () {
     });
 });
 
+Route::middleware(['auth', 'superadmin'])->prefix('superadmin')->name('superadmin.')->group(function () {
+    Route::get('withdrawals', [SuperAdminWithdrawalController::class, 'index'])->name('withdrawals.index');
+    Route::post('withdrawals/{withdrawal}/approve', [SuperAdminWithdrawalController::class, 'approve'])->name('withdrawals.approve');
+    Route::post('withdrawals/{withdrawal}/reject', [SuperAdminWithdrawalController::class, 'reject'])->name('withdrawals.reject');
+});
+
 Route::get('/join/{slug}', [PlayerJoinController::class, 'show'])->name('player.join.show');
 Route::post('/join/{slug}', [PlayerJoinController::class, 'store'])->name('player.join.store');
 Route::get('/join/{slug}/success', [PlayerJoinController::class, 'success'])->name('player.join.success');
 Route::post('/join/{slug}/simulate-payment', [PlayerJoinController::class, 'simulateOnlinePayment'])->name('player.join.simulatePayment');
 Route::post('/join/{slug}/midtrans/token', [PlayerJoinController::class, 'midtransToken'])->name('player.join.midtrans.token');
 Route::post('/join/{slug}/midtrans/finish', [PlayerJoinController::class, 'midtransFinish'])->name('player.join.midtrans.finish');
+Route::post('/join/{slug}/midtrans/status', [PlayerJoinController::class, 'midtransStatus'])->name('player.join.midtrans.status');
+Route::post('/join/{slug}/cancel', [PlayerJoinController::class, 'cancel'])->name('player.join.cancel');
 
 Route::get('/dashboard', function () {
     return view('dashboard');

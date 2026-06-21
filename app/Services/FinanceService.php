@@ -27,7 +27,14 @@ class FinanceService
                 DB::raw("SUM(CASE WHEN mp.status_join = '" . JoinStatus::JOINED->value . "' THEN 1 ELSE 0 END) as joined_count"),
                 DB::raw("SUM(CASE WHEN mp.payment_status = '" . PaymentStatus::PAID->value . "' THEN 1 ELSE 0 END) as paid_count"),
                 DB::raw('m.biaya_total_event as expected_amount'),
-                DB::raw("SUM(CASE WHEN mp.payment_status = '" . PaymentStatus::PAID->value . "' THEN mp.payment_amount ELSE 0 END) as collected_amount")
+                DB::raw("SUM(CASE WHEN mp.payment_status = '" . PaymentStatus::PAID->value . "' THEN
+                    CASE
+                        WHEN mp.payment_method != 'online_banking' THEN mp.payment_amount
+                        WHEN mp.payment_amount <= 50500             THEN mp.payment_amount - 1500
+                        WHEN mp.payment_amount <= 102000            THEN mp.payment_amount - 3000
+                        ELSE                                             mp.payment_amount / 1.03
+                    END
+                ELSE 0 END) as collected_amount")
             )
             ->where('m.admin_id', $adminId)
             ->whereNull('m.deleted_at');
@@ -63,7 +70,14 @@ class FinanceService
                 DB::raw("SUM(CASE WHEN mp.status_join = '" . JoinStatus::JOINED->value . "' THEN 1 ELSE 0 END) as joined_count"),
                 DB::raw("SUM(CASE WHEN mp.payment_status = '" . PaymentStatus::PAID->value . "' THEN 1 ELSE 0 END) as paid_count"),
                 DB::raw('m.biaya_total_event as expected_amount'),
-                DB::raw("SUM(CASE WHEN mp.payment_status = '" . PaymentStatus::PAID->value . "' THEN mp.payment_amount ELSE 0 END) as collected_amount")
+                DB::raw("SUM(CASE WHEN mp.payment_status = '" . PaymentStatus::PAID->value . "' THEN
+                    CASE
+                        WHEN mp.payment_method != 'online_banking' THEN mp.payment_amount
+                        WHEN mp.payment_amount <= 50500             THEN mp.payment_amount - 1500
+                        WHEN mp.payment_amount <= 102000            THEN mp.payment_amount - 3000
+                        ELSE                                             mp.payment_amount / 1.03
+                    END
+                ELSE 0 END) as collected_amount")
             )
             ->where('m.admin_id', $adminId)
             ->whereNull('m.deleted_at');
@@ -91,7 +105,14 @@ class FinanceService
             ->leftJoin('event_player as mp', 'mp.event_id', '=', 'm.id')
             ->select(
                 DB::raw('COALESCE(SUM(DISTINCT m.biaya_total_event), 0) as total_expected'),
-                DB::raw("SUM(CASE WHEN mp.payment_status = '" . PaymentStatus::PAID->value . "' THEN mp.payment_amount ELSE 0 END) as total_collected"),
+                DB::raw("SUM(CASE WHEN mp.payment_status = '" . PaymentStatus::PAID->value . "' THEN
+                    CASE
+                        WHEN mp.payment_method != 'online_banking' THEN mp.payment_amount
+                        WHEN mp.payment_amount <= 50500             THEN mp.payment_amount - 1500
+                        WHEN mp.payment_amount <= 102000            THEN mp.payment_amount - 3000
+                        ELSE                                             mp.payment_amount / 1.03
+                    END
+                ELSE 0 END) as total_collected"),
                 DB::raw("SUM(CASE WHEN mp.payment_status = '" . PaymentStatus::PAID->value . "' THEN 1 ELSE 0 END) as total_paid_players")
             )
             ->where('m.admin_id', $adminId)
@@ -136,7 +157,14 @@ class FinanceService
         $totals = DB::table('events as m')
             ->leftJoin('event_player as mp', 'mp.event_id', '=', 'm.id')
             ->select(
-                DB::raw("SUM(CASE WHEN mp.payment_status = '" . PaymentStatus::PAID->value . "' THEN mp.payment_amount ELSE 0 END) as total_collected")
+                DB::raw("SUM(CASE WHEN mp.payment_status = '" . PaymentStatus::PAID->value . "' THEN
+                    CASE
+                        WHEN mp.payment_method != 'online_banking' THEN mp.payment_amount
+                        WHEN mp.payment_amount <= 50500             THEN mp.payment_amount - 1500
+                        WHEN mp.payment_amount <= 102000            THEN mp.payment_amount - 3000
+                        ELSE                                             mp.payment_amount / 1.03
+                    END
+                ELSE 0 END) as total_collected")
             )
             ->where('m.admin_id', $adminId)
             ->whereNull('m.deleted_at')

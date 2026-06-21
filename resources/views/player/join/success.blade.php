@@ -58,6 +58,26 @@
     @php
         $status = $latestJoin ? $latestJoin->pivot->payment_status : 'pending';
         $statusLabel = strtoupper($status);
+
+        $computeAdminFee = function (float $base, string $method) {
+            if ($method !== 'online_banking') {
+                return 0.0;
+            }
+            if ($base <= 49000) {
+                return 1500.0;
+            }
+            if ($base <= 99000) {
+                return 3000.0;
+            }
+            return (float) ($base * 0.03);
+        };
+
+        if ($latestJoin) {
+            $paymentAmount = (float) $latestJoin->pivot->payment_amount;
+        } else {
+            $basePrice = (float) $event->iuran_per_pemain;
+            $paymentAmount = $basePrice + $computeAdminFee($basePrice, $event->metode_pembayaran);
+        }
     @endphp
 
     <div class="max-w-xl mx-auto px-4 py-10 fade-up">
@@ -110,7 +130,7 @@
                         Iuran Anda
                     </span>
                     <span class="font-bold text-brand-500">
-                        Rp {{ number_format((float) ($latestJoin ? $latestJoin->pivot->payment_amount : $event->iuran_per_pemain), 0, ',', '.') }}
+                        Rp {{ number_format($paymentAmount, 0, ',', '.') }}
                     </span>
                 </div>
                 <div class="flex items-center justify-between text-sm">
@@ -147,15 +167,71 @@
                 @endif
             @endif
 
-            {{-- Back Link --}}
+            {{-- Back / Cancel --}}
             <div class="mt-6 text-center">
-                <a href="{{ route('player.join.show', $event->slug) }}" class="inline-flex items-center gap-1.5 text-brand-500 hover:text-brand-600 font-semibold text-sm transition-colors">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
-                    Kembali ke Halaman Event
-                </a>
+                @if($latestJoin && $latestJoin->pivot->payment_status !== 'paid')
+                    <button type="button" id="btn-cancel-reg"
+                        class="inline-flex items-center gap-1.5 text-rose-400 hover:text-rose-600 font-semibold text-sm transition-colors">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+                        Kembali ke Halaman Event
+                    </button>
+                @else
+                    <a href="{{ route('player.join.show', $event->slug) }}"
+                        class="inline-flex items-center gap-1.5 text-brand-500 hover:text-brand-600 font-semibold text-sm transition-colors">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+                        Kembali ke Halaman Event
+                    </a>
+                @endif
             </div>
         </div>
     </div>
+
+    {{-- Cancel Confirmation Modal --}}
+    @if($latestJoin && $latestJoin->pivot->payment_status !== 'paid')
+    <div id="modal-cancel" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4">
+        <div id="modal-backdrop" class="absolute inset-0 bg-black/40 backdrop-blur-sm"></div>
+        <div class="relative bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 fade-up">
+            <div class="flex items-center justify-center w-12 h-12 rounded-full bg-rose-100 mx-auto mb-4">
+                <svg class="w-6 h-6 text-rose-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+                </svg>
+            </div>
+            <h2 class="text-lg font-bold text-gray-900 text-center">Batalkan Pendaftaran?</h2>
+            <p class="text-sm text-gray-500 text-center mt-2">
+                Data pendaftaran Anda akan <span class="font-semibold text-rose-500">dihapus</span> dan Anda perlu mendaftar ulang jika ingin bergabung kembali.
+            </p>
+            <div class="mt-6 flex gap-3">
+                <button type="button" id="btn-cancel-no"
+                    class="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors">
+                    Tetap Daftar
+                </button>
+                <form action="{{ route('player.join.cancel', $event->slug) }}" method="POST" class="flex-1">
+                    @csrf
+                    <button type="submit"
+                        class="w-full py-2.5 rounded-xl bg-rose-500 hover:bg-rose-600 text-white text-sm font-bold transition-colors">
+                        Ya, Batalkan
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        (function () {
+            const modal = document.getElementById('modal-cancel');
+            const btnOpen = document.getElementById('btn-cancel-reg');
+            const btnClose = document.getElementById('btn-cancel-no');
+            const backdrop = document.getElementById('modal-backdrop');
+
+            function openModal() { modal.classList.remove('hidden'); modal.classList.add('flex'); }
+            function closeModal() { modal.classList.add('hidden'); modal.classList.remove('flex'); }
+
+            if (btnOpen) btnOpen.addEventListener('click', openModal);
+            if (btnClose) btnClose.addEventListener('click', closeModal);
+            if (backdrop) backdrop.addEventListener('click', closeModal);
+        })();
+    </script>
+    @endif
 
     @if($latestJoin && $latestJoin->pivot->payment_method === 'online_banking' && $latestJoin->pivot->payment_status !== 'paid')
         <script>
@@ -164,10 +240,16 @@
                 const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
                 const tokenUrl = @json(route('player.join.midtrans.token', $event->slug));
                 const finishUrl = @json(route('player.join.midtrans.finish', $event->slug));
+                const statusUrl = @json(route('player.join.midtrans.status', $event->slug));
+                const successUrl = @json(route('player.join.success', $event->slug));
+                const registrationUrl = @json(route('player.join.show', $event->slug));
+                const playerId = @json($latestJoin->id);
+                const paymentReference = @json($latestJoin->pivot->payment_reference);
 
                 async function postJson(url, payload) {
                     const response = await fetch(url, {
                         method: 'POST',
+                        credentials: 'same-origin',
                         headers: {
                             'Content-Type': 'application/json',
                             'Accept': 'application/json',
@@ -193,22 +275,62 @@
                         window.snap.pay(tokenResult.token, {
                             onSuccess: async (result) => {
                                 await postJson(finishUrl, result);
-                                window.location.reload();
+                                pollingActive = false;
+                                window.location.href = registrationUrl;
                             },
                             onPending: async (result) => {
                                 await postJson(finishUrl, result);
-                                window.location.reload();
+                                pollingActive = false;
+                                window.location.href = successUrl;
                             },
                             onError: async (result) => {
                                 await postJson(finishUrl, result);
                                 payButton.disabled = false;
                             },
-                            onClose: () => {
+                            onClose: async () => {
                                 payButton.disabled = false;
+                                await redirectIfPaid();
                             },
                         });
                     });
                 }
+
+                let pollingActive = true;
+
+                async function checkPaymentStatus() {
+                    if (!pollingActive) {
+                        return false;
+                    }
+                    try {
+                        const result = await postJson(statusUrl, {
+                            player_id: playerId,
+                            payment_reference: paymentReference,
+                        });
+                        if (result.status === 'paid') {
+                            pollingActive = false;
+                            return true;
+                        }
+                    } catch (error) {
+                        // ignore transient polling failures
+                    }
+                    return false;
+                }
+
+                async function redirectIfPaid() {
+                    if (await checkPaymentStatus()) {
+                        window.location.replace(registrationUrl);
+                    }
+                }
+
+                redirectIfPaid();
+
+                window.addEventListener('focus', redirectIfPaid);
+                const pollInterval = setInterval(redirectIfPaid, 5000);
+
+                window.addEventListener('beforeunload', () => {
+                    pollingActive = false;
+                    clearInterval(pollInterval);
+                });
             })();
         </script>
     @endif

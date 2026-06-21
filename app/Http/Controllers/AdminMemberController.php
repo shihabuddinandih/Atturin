@@ -28,7 +28,14 @@ class AdminMemberController extends Controller
                 'p.kontak',
                 DB::raw("SUM(CASE WHEN mp.status_join = '" . JoinStatus::JOINED->value . "' THEN 1 ELSE 0 END) as joined_events"),
                 DB::raw("SUM(CASE WHEN mp.payment_status = '" . PaymentStatus::PAID->value . "' THEN 1 ELSE 0 END) as paid_events"),
-                DB::raw("SUM(CASE WHEN mp.payment_status = '" . PaymentStatus::PAID->value . "' THEN mp.payment_amount ELSE 0 END) as total_paid_amount"),
+                DB::raw("SUM(CASE WHEN mp.payment_status = '" . PaymentStatus::PAID->value . "' THEN
+                    CASE
+                        WHEN mp.payment_method != 'online_banking' THEN mp.payment_amount
+                        WHEN mp.payment_amount <= 50500             THEN mp.payment_amount - 1500
+                        WHEN mp.payment_amount <= 102000            THEN mp.payment_amount - 3000
+                        ELSE                                             mp.payment_amount / 1.03
+                    END
+                ELSE 0 END) as total_paid_amount"),
                 DB::raw('MAX(mp.created_at) as last_joined_at')
             )
             ->whereNotNull('e.id');
@@ -65,7 +72,14 @@ class AdminMemberController extends Controller
             ->select(
                 DB::raw('COUNT(DISTINCT p.id) as total_members'),
                 DB::raw("COUNT(DISTINCT CASE WHEN mp.status_join = '" . JoinStatus::JOINED->value . "' THEN p.id END) as active_members"),
-                DB::raw("SUM(CASE WHEN mp.payment_status = '" . PaymentStatus::PAID->value . "' THEN mp.payment_amount ELSE 0 END) as total_paid_amount"),
+                DB::raw("SUM(CASE WHEN mp.payment_status = '" . PaymentStatus::PAID->value . "' THEN
+                    CASE
+                        WHEN mp.payment_method != 'online_banking' THEN mp.payment_amount
+                        WHEN mp.payment_amount <= 50500             THEN mp.payment_amount - 1500
+                        WHEN mp.payment_amount <= 102000            THEN mp.payment_amount - 3000
+                        ELSE                                             mp.payment_amount / 1.03
+                    END
+                ELSE 0 END) as total_paid_amount"),
                 DB::raw("SUM(CASE WHEN mp.status_join = '" . JoinStatus::JOINED->value . "' THEN 1 ELSE 0 END) as total_joined_count"),
                 DB::raw("SUM(CASE WHEN mp.payment_status = '" . PaymentStatus::PAID->value . "' THEN 1 ELSE 0 END) as total_paid_count")
             )

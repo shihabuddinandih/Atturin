@@ -231,6 +231,7 @@
         </form>
     </div>
 </div>
+<input type="hidden" id="old_roles_json" value='@json(old('roles', []))'>
 @endsection
 
 @push('scripts')
@@ -251,12 +252,37 @@
         playersToggle.addEventListener('change', syncToggles);
         syncToggles();
 
-        // 2. Min Date Validation Lock (Lock past dates)
+        // 2. Default & Min Date/Time Settings (Auto-fill with current local time)
         const dateInput = document.getElementById('tanggal');
-        if (dateInput) {
-            const today = new Date().toISOString().split('T')[0];
-            dateInput.setAttribute('min', today);
+        const timeInput = document.getElementById('waktu');
+
+        if (dateInput || timeInput) {
+            const now = new Date();
+            
+            // Local date components
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const day = String(now.getDate()).padStart(2, '0');
+            const localDate = `${year}-${month}-${day}`;
+            
+            // Local time components
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            const localTime = `${hours}:${minutes}`;
+
+            if (dateInput) {
+                dateInput.setAttribute('min', localDate);
+                if (!dateInput.value) {
+                    dateInput.value = localDate;
+                }
+            }
+            if (timeInput) {
+                if (!timeInput.value) {
+                    timeInput.value = localTime;
+                }
+            }
         }
+
 
         const modeInputFlat = document.querySelector('input[name="skema_iuran"][value="flat"]');
         const modeInputCustom = document.querySelector('input[name="skema_iuran"][value="custom"]');
@@ -276,7 +302,7 @@
         const payMethodContainer = document.getElementById('container-metode-pembayaran');
         const gratisBadgeContainer = document.getElementById('container-gratis-badge');
 
-        const existingRoles = @json(old('roles', []));
+        const existingRoles = JSON.parse(document.getElementById('old_roles_json')?.value || '[]');
 
         function formatRupiah(value) {
             return 'Rp ' + Math.round(value).toLocaleString('id-ID');
@@ -309,9 +335,19 @@
             simulatorBoxFlat.classList.toggle('hidden', isCustom);
             biayaMask.classList.toggle('hidden', isCustom);
             if (!isCustom) {
-                simulatorBoxLoyalitas.classList.add('hidden');
+                simulatorBoxLoyalitas?.classList.add('hidden');
             }
+            setCustomInputsEnabled(isCustom);
             updateModeLabels();
+        }
+
+        function setCustomInputsEnabled(enabled) {
+            customRolesList.querySelectorAll('input').forEach((input) => {
+                input.disabled = !enabled;
+            });
+            if (addRoleButton) {
+                addRoleButton.disabled = !enabled;
+            }
         }
 
         function syncPaymentMethodVisibility() {
@@ -428,10 +464,10 @@
         });
         if (slotsInput) slotsInput.addEventListener('input', runSimulation);
 
+        renderExistingRoles();
         updateModeSettings();
         runSimulation();
         syncPaymentMethodVisibility();
-        renderExistingRoles();
     })();
 </script>
 @endpush

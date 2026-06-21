@@ -27,7 +27,9 @@ class Player extends Model
             'payment_amount',
             'payment_status',
             'payment_reference',
-            'payment_paid_at'
+            'payment_paid_at',
+            'payment_expires_at',
+            'payment_snap_token'
         )->withTimestamps();
     }
 }

@@ -120,19 +120,6 @@ class AdminFinanceController extends Controller
 
     public function processWithdrawal(AdminWalletWithdrawal $withdrawal)
     {
-        if ($withdrawal->admin_id !== auth()->id()) {
-            abort(403);
-        }
-
-        if ($withdrawal->status !== 'pending') {
-            return redirect()->route('admin.finances.index')->with('error', 'Penarikan hanya dapat diproses jika statusnya pending.');
-        }
-
-        $withdrawal->update([
-            'status' => 'completed',
-            'processed_at' => now(),
-        ]);
-
-        return redirect()->route('admin.finances.index')->with('success', 'Penarikan berhasil diselesaikan (demo).');
+        abort(403, 'Aksi ini tidak diizinkan. Hanya Super Admin yang dapat menyetujui atau memproses penarikan dana.');
     }
 }

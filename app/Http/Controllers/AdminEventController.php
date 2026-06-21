@@ -33,6 +33,8 @@ class AdminEventController extends Controller
 
     public function store(Request $request)
     {
+        $request->merge(['skema_iuran' => $request->input('skema_iuran', 'flat')]);
+
         $validated = $request->validate([
             'nama_event' => 'required|string|max:255',
             'tanggal' => 'required|date',
@@ -70,6 +72,8 @@ class AdminEventController extends Controller
             $validated['biaya_total_event'] = array_sum(array_map(function ($role) {
                 return ((float) $role['price']) * ((int) $role['slots']);
             }, $roles));
+        } else {
+            unset($validated['roles']);
         }
 
         // Calculate iuran_per_pemain for both schemes
@@ -203,12 +207,14 @@ class AdminEventController extends Controller
 
         if ($validated['payment_status'] === PaymentStatus::PAID->value) {
             $payload['payment_paid_at'] = now();
+            $payload['status_join'] = 'joined';
             if (empty($player->pivot->payment_reference)) {
                 $prefix = $player->pivot->payment_method === 'online_banking' ? 'ADMIN-MB' : 'ADMIN-CASH';
                 $payload['payment_reference'] = $prefix . '-' . strtoupper(Str::random(8));
             }
         } else {
             $payload['payment_paid_at'] = null;
+            $payload['status_join'] = 'batal';
         }
 
         $event->players()->updateExistingPivot($playerId, $payload);

@@ -40,6 +40,8 @@
             <p class="text-base font-bold text-gray-900 mt-1">
                 @if($event->skema_iuran === 'loyalitas')
                     Subsidi Silang (Loyalty Split)
+                @elseif($event->skema_iuran === 'custom')
+                    Custom (Per Role)
                 @else
                     Bagi Rata (Flat Split)
                 @endif
@@ -51,9 +53,42 @@
                 <p class="text-xs text-amber-600 font-semibold mt-1">
                     Total Biaya Event: Rp {{ number_format((float) $event->biaya_total_event, 0, ',', '.') }}
                 </p>
+                <p class="text-xs text-gray-400 mt-0.5">
+                    Iuran per pemain: Rp {{ number_format((float) $event->iuran_per_pemain, 0, ',', '.') }}
+                    @if($event->metode_pembayaran === 'online_banking')
+                        <span class="text-amber-500">(belum termasuk biaya admin)</span>
+                    @endif
+                </p>
+            @elseif($event->skema_iuran === 'custom')
+                @php
+                    $roles = collect($event->roles ?? []);
+                @endphp
+                @if($roles->isNotEmpty())
+                    <div class="mt-2 space-y-1">
+                        @foreach($roles as $role)
+                            <div class="flex items-center justify-between text-xs">
+                                <span class="text-gray-600 font-medium">{{ $role['name'] }}
+                                    <span class="text-gray-400 font-normal">({{ $role['slots'] }} slot)</span>
+                                </span>
+                                <span class="font-semibold text-gray-800">Rp {{ number_format((float)($role['price'] ?? 0), 0, ',', '.') }}
+                                    @if($event->metode_pembayaran === 'online_banking')
+                                        <span class="text-amber-500 font-normal">+admin</span>
+                                    @endif
+                                </span>
+                            </div>
+                        @endforeach
+                    </div>
+                    @if($event->metode_pembayaran === 'online_banking')
+                        <p class="text-[10px] text-amber-500 mt-1.5">* Harga di atas belum termasuk biaya admin sistem</p>
+                    @endif
+                @endif
             @else
-                <p class="text-xs text-gray-400 mt-1">
-                    Tarif Tetap: Rp {{ number_format((float) $event->iuran_per_pemain, 0, ',', '.') }} / pemain
+                <p class="text-xs text-gray-500 mt-1">
+                    Iuran per pemain:
+                    <span class="font-semibold text-gray-800">Rp {{ number_format((float) $event->iuran_per_pemain, 0, ',', '.') }}</span>
+                    @if($event->metode_pembayaran === 'online_banking')
+                        <span class="text-amber-500">(belum termasuk biaya admin)</span>
+                    @endif
                 </p>
             @endif
         </div>
