@@ -14,8 +14,61 @@
     </div>
 
     <div class="pro-card overflow-hidden">
-        <form action="{{ route('admin.events.store') }}" method="POST">
+        <form action="{{ route('admin.events.store') }}" method="POST" enctype="multipart/form-data">
             @csrf
+
+            {{-- Section: Banner Image --}}
+            <div class="p-6 border-b border-gray-100 bg-gray-50/20">
+                <div class="flex items-center gap-2 mb-5">
+                    <div class="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center">
+                        <svg class="w-4 h-4 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                    </div>
+                    <h3 class="text-sm font-semibold text-gray-900">Hero Banner Event</h3>
+                </div>
+
+                <div class="space-y-4">
+                    <div class="relative">
+                        {{-- Custom Drag & Drop Area --}}
+                        <div id="banner-drop-zone" class="border-2 border-dashed border-gray-200 hover:border-brand-500 rounded-2xl p-6 transition-all duration-300 bg-white hover:bg-brand-50/10 cursor-pointer flex flex-col items-center justify-center min-h-[160px] text-center relative overflow-hidden group">
+                            
+                            {{-- Input file hidden --}}
+                            <input type="file" name="banner_image" id="banner_image" accept="image/jpeg,image/png,image/webp" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10">
+
+                            {{-- No Image Preview State --}}
+                            <div id="banner-placeholder" class="flex flex-col items-center justify-center space-y-3 py-4 transition-all duration-300">
+                                <div class="w-12 h-12 rounded-full bg-slate-50 flex items-center justify-center text-gray-400 group-hover:scale-110 group-hover:text-brand-500 transition-all duration-300 border border-gray-100">
+                                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                                </div>
+                                <div>
+                                    <p class="text-sm font-semibold text-gray-800">Pilih atau Seret gambar hero banner</p>
+                                    <p class="text-xs text-gray-400 mt-1">Format JPG, PNG, atau WebP. Ukuran maks. 2MB</p>
+                                </div>
+                            </div>
+
+                            {{-- Live Image Preview State --}}
+                            <div id="banner-preview-container" class="hidden absolute inset-0 w-full h-full bg-gray-900 flex items-center justify-center">
+                                <img id="banner-preview-img" src="" alt="Banner Preview" class="w-full h-full object-cover">
+                                <div class="absolute inset-0 bg-gradient-to-t from-black/70 to-black/20 flex flex-col justify-end p-4 text-left">
+                                    <p class="text-xs font-semibold text-white/80 uppercase tracking-wider">Preview Banner</p>
+                                    <p id="banner-filename" class="text-sm font-bold text-white truncate max-w-[80%]">filename.jpg</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {{-- Action Buttons --}}
+                        <div id="banner-actions" class="hidden mt-3 flex items-center gap-3">
+                            <button type="button" id="btn-remove-banner" class="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-red-200 bg-red-50 text-sm font-semibold text-red-700 hover:bg-red-100 transition-all">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                                Hapus Gambar
+                            </button>
+                        </div>
+
+                        @error('banner_image')
+                            <p class="mt-2 text-xs text-rose-600">{{ $message }}</p>
+                        @enderror
+                    </div>
+                </div>
+            </div>
 
             {{-- Section: Event Info --}}
             <div class="p-6 border-b border-gray-100">
@@ -66,6 +119,22 @@
                         <input type="number" name="slot_max" id="slot_max" min="1" value="{{ old('slot_max') }}"
                                class="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-gray-800 placeholder-gray-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/10 transition-all"
                                required placeholder="Cth: 15">
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1.5">Fasilitas Event</label>
+                        <div id="facilities-list" class="space-y-3">
+                            {{-- Dynamic facility rows inserted by JavaScript --}}
+                        </div>
+                        <button type="button" id="add-facility-button" class="mt-3 inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-brand-500 bg-brand-50 text-sm font-semibold text-brand-700 hover:bg-brand-100 transition-all">
+                            + Tambah Fasilitas
+                        </button>
+                        @error('facilities')
+                            <p class="mt-2 text-xs text-rose-600">{{ $message }}</p>
+                        @enderror
+                        @error('facilities.*')
+                            <p class="mt-2 text-xs text-rose-600">{{ $message }}</p>
+                        @enderror
                     </div>
                 </div>
             </div>
@@ -232,6 +301,7 @@
     </div>
 </div>
 <input type="hidden" id="old_roles_json" value='@json(old('roles', []))'>
+<input type="hidden" id="old_facilities_json" value='@json(old('facilities', []))'>
 @endsection
 
 @push('scripts')
@@ -251,6 +321,79 @@
 
         playersToggle.addEventListener('change', syncToggles);
         syncToggles();
+
+        // Banner Image Upload Preview
+        const bannerImageInput = document.getElementById('banner_image');
+        const bannerDropZone = document.getElementById('banner-drop-zone');
+        const bannerPlaceholder = document.getElementById('banner-placeholder');
+        const bannerPreviewContainer = document.getElementById('banner-preview-container');
+        const bannerPreviewImg = document.getElementById('banner-preview-img');
+        const bannerFilename = document.getElementById('banner-filename');
+        const bannerActions = document.getElementById('banner-actions');
+        const btnRemoveBanner = document.getElementById('btn-remove-banner');
+
+        if (bannerImageInput && bannerDropZone) {
+            bannerImageInput.addEventListener('change', function (e) {
+                const file = this.files[0];
+                if (file) {
+                    // Check file size (2MB)
+                    if (file.size > 2 * 1024 * 1024) {
+                        alert('Ukuran file terlalu besar! Maksimal 2MB.');
+                        this.value = '';
+                        resetBannerPreview();
+                        return;
+                    }
+
+                    const reader = new FileReader();
+                    reader.onload = function (e) {
+                        bannerPreviewImg.src = e.target.result;
+                        bannerFilename.textContent = file.name;
+                        
+                        bannerPlaceholder.classList.add('hidden');
+                        bannerPreviewContainer.classList.remove('hidden');
+                        bannerActions.classList.remove('hidden');
+                        bannerDropZone.classList.remove('border-dashed');
+                        bannerDropZone.classList.add('border-solid', 'border-brand-500');
+                    }
+                    reader.readAsDataURL(file);
+                } else {
+                    resetBannerPreview();
+                }
+            });
+
+            btnRemoveBanner.addEventListener('click', function () {
+                bannerImageInput.value = '';
+                resetBannerPreview();
+            });
+
+            function resetBannerPreview() {
+                bannerPreviewImg.src = '';
+                bannerFilename.textContent = '';
+                
+                bannerPlaceholder.classList.remove('hidden');
+                bannerPreviewContainer.classList.add('hidden');
+                bannerActions.classList.add('hidden');
+                bannerDropZone.classList.remove('border-solid', 'border-brand-500');
+                bannerDropZone.classList.add('border-dashed');
+            }
+
+            // Drag and drop effects
+            ['dragenter', 'dragover'].forEach(eventName => {
+                bannerDropZone.addEventListener(eventName, highlight, false);
+            });
+
+            ['dragleave', 'drop'].forEach(eventName => {
+                bannerDropZone.addEventListener(eventName, unhighlight, false);
+            });
+
+            function highlight(e) {
+                bannerDropZone.classList.add('border-brand-500', 'bg-brand-50/10');
+            }
+
+            function unhighlight(e) {
+                bannerDropZone.classList.remove('border-brand-500', 'bg-brand-50/10');
+            }
+        }
 
         // 2. Default & Min Date/Time Settings (Auto-fill with current local time)
         const dateInput = document.getElementById('tanggal');
@@ -303,6 +446,9 @@
         const gratisBadgeContainer = document.getElementById('container-gratis-badge');
 
         const existingRoles = JSON.parse(document.getElementById('old_roles_json')?.value || '[]');
+        const existingFacilities = JSON.parse(document.getElementById('old_facilities_json')?.value || '[]');
+        const facilitiesList = document.getElementById('facilities-list');
+        const addFacilityButton = document.getElementById('add-facility-button');
 
         function formatRupiah(value) {
             return 'Rp ' + Math.round(value).toLocaleString('id-ID');
@@ -420,6 +566,37 @@
             });
         }
 
+        function createFacilityRow(value = '') {
+            const index = facilitiesList.children.length;
+            const row = document.createElement('div');
+            row.className = 'grid grid-cols-[1fr_0.6fr] gap-3 items-end rounded-xl border border-gray-200 bg-white p-4';
+            row.innerHTML = `
+                <div>
+                    <label class="block text-xs font-semibold text-gray-700 mb-1">Fasilitas</label>
+                    <input type="text" name="facilities[${index}]" value="${value}" class="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm text-gray-800 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/10" placeholder="Contoh: Makan">
+                </div>
+                <div class="flex items-center justify-end">
+                    <button type="button" class="remove-facility-button inline-flex items-center justify-center rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700 hover:bg-red-100 transition-all">
+                        Hapus
+                    </button>
+                </div>
+            `;
+            facilitiesList.appendChild(row);
+            row.querySelector('.remove-facility-button')?.addEventListener('click', () => {
+                row.remove();
+                refreshFacilityInputs();
+            });
+        }
+
+        function refreshFacilityInputs() {
+            [...facilitiesList.children].forEach((row, index) => {
+                const input = row.querySelector('input[name^="facilities"]');
+                if (input) {
+                    input.name = `facilities[${index}]`;
+                }
+            });
+        }
+
         function refreshCustomTotals() {
             const rows = [...customRolesList.querySelectorAll('div.grid')];
             let totalSlots = 0;
@@ -458,6 +635,7 @@
         if (modeInputFlat) modeInputFlat.addEventListener('change', updateModeSettings);
         if (modeInputCustom) modeInputCustom.addEventListener('change', updateModeSettings);
         if (addRoleButton) addRoleButton.addEventListener('click', () => createRoleRow({ name: '', slots: 0, price: 0 }));
+        if (addFacilityButton) addFacilityButton.addEventListener('click', () => createFacilityRow(''));
         if (biayaInput) biayaInput.addEventListener('input', () => {
             runSimulation();
             syncPaymentMethodVisibility();
@@ -465,9 +643,18 @@
         if (slotsInput) slotsInput.addEventListener('input', runSimulation);
 
         renderExistingRoles();
+        renderExistingFacilities();
         updateModeSettings();
         runSimulation();
         syncPaymentMethodVisibility();
+
+        function renderExistingFacilities() {
+            if (existingFacilities.length === 0) {
+                createFacilityRow('');
+                return;
+            }
+            existingFacilities.forEach((facility) => createFacilityRow(facility));
+        }
     })();
 </script>
 @endpush

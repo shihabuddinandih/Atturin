@@ -108,21 +108,46 @@
 
             {{-- Left Column: Event Details --}}
             <div class="lg:col-span-2 space-y-6">
-                {{-- Hero Image --}}
+                {{-- Hero Banner with Date --}}
                 <div class="pro-card overflow-hidden relative">
-                    <div class="h-56 sm:h-72 bg-gradient-to-br from-brand-900 via-brand-700 to-brand-500 flex items-center justify-center relative overflow-hidden">
-                        <div class="absolute inset-0 opacity-10">
-                            <div class="absolute top-10 left-10 w-40 h-40 border-2 border-white rounded-full"></div>
-                            <div class="absolute bottom-5 right-10 w-64 h-64 border-2 border-white rounded-full"></div>
-                            <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-32 h-32 border border-white rounded-full"></div>
-                        </div>
-                        <div class="text-center relative z-10">
-                            <p class="text-white/60 text-xs uppercase tracking-widest font-semibold mb-2">Community Event</p>
+                    <div class="h-56 sm:h-72 flex items-center justify-center relative overflow-hidden {{ $event->banner_image ? '' : 'bg-gradient-to-br from-brand-900 via-brand-700 to-brand-500' }}">
+                        @if($event->banner_image)
+                            {{-- Custom Banner Image with Overlay --}}
+                            <img src="{{ asset('storage/' . $event->banner_image) }}" alt="{{ $event->nama_event }}" class="absolute inset-0 w-full h-full object-cover">
+                            <div class="absolute inset-0 bg-slate-950/60 backdrop-blur-[1px]"></div>
+                        @else
+                            {{-- Decorative circles --}}
+                            <div class="absolute inset-0 opacity-10">
+                                <div class="absolute top-10 left-10 w-40 h-40 border-2 border-white rounded-full"></div>
+                                <div class="absolute bottom-5 right-10 w-64 h-64 border-2 border-white rounded-full"></div>
+                                <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-32 h-32 border border-white rounded-full"></div>
+                            </div>
+                        @endif
+
+                        {{-- Center: Event Name --}}
+                        <div class="text-center relative z-10 px-6">
+                            <p class="text-white/80 text-xs uppercase tracking-widest font-semibold mb-2">Community Event</p>
                             <h2 class="text-white text-2xl sm:text-3xl font-bold">{{ $event->nama_event }}</h2>
                         </div>
-                        <span class="absolute top-4 left-4 px-3 py-1 rounded-lg text-xs font-bold {{ $isFull ? 'bg-rose-500 text-white' : 'bg-lime-400 text-brand-900' }}">
+
+                        {{-- Top-left: Status badge --}}
+                        <span class="absolute top-4 left-4 z-10 px-3 py-1 rounded-lg text-xs font-bold {{ $isFull ? 'bg-rose-500 text-white' : 'bg-lime-400 text-brand-900' }}">
                             {{ $isFull ? '✕ Full' : '⚡ Terbuka' }}
                         </span>
+
+                        {{-- Bottom-left: Date & Time prominent pill --}}
+                        <div class="absolute bottom-0 left-0 right-0 px-4 pb-4 flex items-end justify-between z-10">
+                            <div class="flex items-center gap-3 bg-white/15 backdrop-blur-sm border border-white/25 rounded-2xl px-4 py-2.5">
+                                <div class="flex items-center justify-center w-9 h-9 rounded-xl bg-white/20">
+                                    <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                                </div>
+                                <div>
+                                    <p class="text-white/70 text-[10px] uppercase tracking-wider font-semibold leading-none mb-0.5">Jadwal Event</p>
+                                    <p class="text-white font-bold text-sm leading-tight">{{ \Carbon\Carbon::parse($event->tanggal)->translatedFormat('l, d M Y') }}</p>
+                                    <p class="text-lime-300 font-semibold text-xs mt-0.5">🕐 {{ $event->waktu }} WIB</p>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -131,12 +156,6 @@
                     <span class="px-3 py-1 rounded-full text-xs font-medium border border-gray-200 text-gray-600">Sport</span>
                     <span class="px-3 py-1 rounded-full text-xs font-medium border border-gray-200 text-gray-600">{{ $paymentLabel }}</span>
                     <span class="px-3 py-1 rounded-full text-xs font-medium border border-gray-200 text-gray-600">{{ $event->slot_max }} Slot</span>
-                </div>
-
-                {{-- Date --}}
-                <div class="flex items-center gap-2 text-sm text-gray-600">
-                    <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-                    {{ \Carbon\Carbon::parse($event->tanggal)->translatedFormat('l, d M Y') }} • {{ $event->waktu }} WIB
                 </div>
 
                 {{-- Location + Info Grid --}}
@@ -199,7 +218,21 @@
                             </div>
                         </div>
                     </div>
-                </div>
+                </div>{{-- end grid Lokasi + Informasi --}}
+
+                @if(!empty($event->facilities) && is_array($event->facilities))
+                    <div class="pro-card p-5">
+                        <div class="flex items-center gap-2 mb-3">
+                            <svg class="w-4 h-4 text-brand-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                            <h4 class="text-sm font-semibold text-gray-900">Fasilitas</h4>
+                        </div>
+                        <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 text-sm text-gray-700">
+                            @foreach($event->facilities as $facility)
+                                <div class="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5">{{ $facility }}</div>
+                            @endforeach
+                        </div>
+                    </div>
+                @endif
 
                 @if($isCustomEvent)
                     <div class="pro-card p-6">
@@ -217,7 +250,7 @@
                                     $roleAdminFee = $role['admin_fee'] ?? $computeAdminFee($rolePrice, $event->metode_pembayaran);
                                     $roleDisplayPrice = $role['display_price'] ?? ($rolePrice + $roleAdminFee);
                                 @endphp
-                                <div class="rounded-3xl border border-gray-200 bg-gray-50 p-4">
+                                <div class="rounded-2xl border border-gray-200 bg-gray-50 p-4">
                                     <div class="flex items-center justify-between gap-3">
                                         <div>
                                             <p class="text-sm font-semibold text-gray-900">{{ $role['name'] }}</p>
@@ -245,7 +278,7 @@
                     </div>
                 @endif
 
-                {{-- Registration Form --}}
+                {{-- Registration Form (mobile only) --}}
                 @if(!$isFull)
                 <div class="pro-card p-6 lg:hidden">
                     <h3 class="text-lg font-semibold text-gray-900 mb-1">Isi Data Pemain</h3>
@@ -263,22 +296,22 @@
                                 <select id="role_mobile" name="role_name" required
                                         class="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm focus:border-brand-500 focus:ring-2 focus:ring-brand-500/10 bg-white">
                                     <option value="">Pilih role...</option>
-                                            @foreach($customRoles as $role)
-                                                @php
-                                                    $rolePrice = (float) ($role['price'] ?? 0);
-                                                    $optDisplay = $role['display_price'] ?? ($rolePrice + $computeAdminFee($rolePrice, $event->metode_pembayaran));
-                                                @endphp
-                                                <option value="{{ $role['name'] }}" {{ old('role_name') === $role['name'] ? 'selected' : '' }} @if(!empty($role['is_full'])) disabled @endif>
-                                                    {{ $role['name'] }} — Rp {{ number_format($optDisplay, 0, ',', '.') }} ({{ $role['slots'] }} slot) @if(!empty($role['is_full'])) - Penuh @endif
-                                                </option>
-                                            @endforeach
+                                    @foreach($customRoles as $role)
+                                        @php
+                                            $rolePrice = (float) ($role['price'] ?? 0);
+                                            $optDisplay = $role['display_price'] ?? ($rolePrice + $computeAdminFee($rolePrice, $event->metode_pembayaran));
+                                        @endphp
+                                        <option value="{{ $role['name'] }}" {{ old('role_name') === $role['name'] ? 'selected' : '' }} @if(!empty($role['is_full'])) disabled @endif>
+                                            {{ $role['name'] }} — Rp {{ number_format($optDisplay, 0, ',', '.') }} ({{ $role['slots'] }} slot) @if(!empty($role['is_full'])) - Penuh @endif
+                                        </option>
+                                    @endforeach
                                 </select>
                                 @error('role_name')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror
                             </div>
                         @endif
                         <div>
                             <label for="nama_mobile" class="block text-sm font-medium text-gray-700 mb-1.5">Nama Lengkap</label>
-                            <input id="nama_mobile" name="nama" type="text" required value="{{ old('nama') }}" placeholder="Masukkan nama sesuai KTP"
+                            <input id="nama_mobile" name="nama" type="text" required value="{{ old('nama') }}" placeholder="Masukkan nama"
                                    class="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm focus:border-brand-500 focus:ring-2 focus:ring-brand-500/10">
                             @error('nama')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror
                         </div>
@@ -295,7 +328,7 @@
                     </form>
                 </div>
                 @endif
-            </div>
+            </div>{{-- end left column --}}
 
             {{-- Right Column: Slot + Roster + Desktop Form --}}
             <div class="space-y-6">

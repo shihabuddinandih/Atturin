@@ -94,6 +94,17 @@
         </div>
     </div>
 
+    @if(!empty($event->facilities) && is_array($event->facilities))
+        <div class="pro-card p-5">
+            <div class="text-[11px] font-bold uppercase tracking-wider text-gray-400 mb-2">Fasilitas Event</div>
+            <div class="flex flex-wrap gap-2">
+                @foreach($event->facilities as $facility)
+                    <span class="inline-flex items-center rounded-full bg-brand-50 px-3 py-1 text-xs font-semibold text-brand-700 border border-brand-100">{{ $facility }}</span>
+                @endforeach
+            </div>
+        </div>
+    @endif
+
     {{-- Join Link --}}
     <div class="pro-card p-5 border-l-4 border-l-brand-500">
         <div class="text-[11px] font-bold uppercase tracking-wider text-brand-500 mb-2">Join Link</div>

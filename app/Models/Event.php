@@ -24,6 +24,7 @@ class Event extends Model
         'metode_pembayaran',
         'iuran_per_pemain',
         'biaya_total_event',
+        'facilities',
         'skema_iuran',
         'roles',
         'show_joined_players_public',
@@ -31,6 +32,7 @@ class Event extends Model
         'slug',
         'join_code',
         'required_fields',
+        'banner_image',
     ];
 
     protected $casts = [
@@ -40,6 +42,7 @@ class Event extends Model
         'show_joined_player_contacts_public' => 'boolean',
         'required_fields' => 'array',
         'roles' => 'array',
+        'facilities' => 'array',
         'tanggal' => 'date',
     ];
 

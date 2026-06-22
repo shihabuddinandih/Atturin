@@ -48,9 +48,17 @@ class AdminEventController extends Controller
             'roles.*.name' => 'required_if:skema_iuran,custom|string|max:255',
             'roles.*.slots' => 'required_if:skema_iuran,custom|integer|min:1',
             'roles.*.price' => 'required_if:skema_iuran,custom|numeric|min:0',
+            'facilities' => 'nullable|array',
+            'facilities.*' => 'nullable|string|max:255',
             'show_joined_players_public' => 'nullable|boolean',
             'show_joined_player_contacts_public' => 'nullable|boolean',
+            'banner_image' => 'nullable|image|max:2048',
         ]);
+
+        if ($request->hasFile('banner_image')) {
+            $path = $request->file('banner_image')->store('banners', 'public');
+            $validated['banner_image'] = $path;
+        }
 
         $validated['show_joined_players_public'] = $request->boolean('show_joined_players_public', true);
         $validated['show_joined_player_contacts_public'] = $request->boolean('show_joined_player_contacts_public');
@@ -74,6 +82,14 @@ class AdminEventController extends Controller
             }, $roles));
         } else {
             unset($validated['roles']);
+        }
+
+        $validated['facilities'] = array_values(array_filter($validated['facilities'] ?? [], function ($facility) {
+            return trim((string) $facility) !== '';
+        }));
+
+        if (empty($validated['facilities'])) {
+            $validated['facilities'] = null;
         }
 
         // Calculate iuran_per_pemain for both schemes
