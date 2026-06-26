@@ -20,7 +20,7 @@ Route::get('/', function () {
     if (auth()->check()) {
         return redirect(auth()->user()->homePath());
     }
-    return redirect()->route('admin.dashboard');
+    return view('landing');
 });
 
 Route::prefix('admin')->name('admin.')->group(function () {
@@ -70,6 +70,9 @@ Route::post('/join/{slug}/midtrans/token', [PlayerJoinController::class, 'midtra
 Route::post('/join/{slug}/midtrans/finish', [PlayerJoinController::class, 'midtransFinish'])->name('player.join.midtrans.finish');
 Route::post('/join/{slug}/midtrans/status', [PlayerJoinController::class, 'midtransStatus'])->name('player.join.midtrans.status');
 Route::post('/join/{slug}/cancel', [PlayerJoinController::class, 'cancel'])->name('player.join.cancel');
+
+// Waiting list claim (public)
+Route::get('/waitlist/claim/{token}', [\App\Http\Controllers\WaitlistController::class, 'claim'])->name('waitlist.claim');
 
 Route::get('/dashboard', function () {
     return view('dashboard');
