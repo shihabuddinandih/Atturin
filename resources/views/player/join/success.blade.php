@@ -106,6 +106,7 @@
                 </div>
                 <h1 class="text-2xl font-bold text-gray-900">Registrasi Berhasil!</h1>
                 <p class="text-sm text-gray-500 mt-2">Anda sudah tercatat di event <span class="font-semibold text-gray-800">{{ $event->nama_event }}</span>.</p>
+                <p class="text-sm text-gray-500 mt-2">Bayar kapan saja sebelum event dimulai dengan tombol pembayaran di bawah.</p>
             </div>
 
             {{-- Event Details --}}
@@ -168,19 +169,18 @@
             @endif
 
             {{-- Back / Cancel --}}
-            <div class="mt-6 text-center">
+            <div class="mt-6 flex flex-col sm:flex-row sm:justify-center gap-3">
+                <a href="{{ route('player.join.show', $event->slug) }}"
+                    class="flex-1 inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+                    Kembali ke Halaman Pendaftaran
+                </a>
                 @if($latestJoin && $latestJoin->pivot->payment_status !== 'paid')
                     <button type="button" id="btn-cancel-reg"
-                        class="inline-flex items-center gap-1.5 text-rose-400 hover:text-rose-600 font-semibold text-sm transition-colors">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
-                        Kembali ke Halaman Event
+                        class="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-rose-500 px-4 py-3 text-sm font-semibold text-white hover:bg-rose-600 transition-colors">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                        Batalkan Pendaftaran
                     </button>
-                @else
-                    <a href="{{ route('player.join.show', $event->slug) }}"
-                        class="inline-flex items-center gap-1.5 text-brand-500 hover:text-brand-600 font-semibold text-sm transition-colors">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
-                        Kembali ke Halaman Event
-                    </a>
                 @endif
             </div>
         </div>

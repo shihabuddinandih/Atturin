@@ -104,6 +104,36 @@
             </div>
         @endif
 
+        @if(!empty($pendingJoinPlayer))
+            <div class="mb-6 rounded-3xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-700">
+                <div class="flex items-start gap-3">
+                    <div class="mt-1 flex h-10 w-10 items-center justify-center rounded-2xl bg-amber-100 text-amber-700">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    </div>
+                    <div class="grow">
+                        <p class="font-semibold text-amber-900">Anda memiliki pendaftaran tertunda untuk event ini.</p>
+                        <p class="mt-2 text-[13px] text-amber-700">Silakan selesaikan pembayaran atau batalkan pendaftaran sebelum membuat pendaftaran baru.</p>
+                        <div class="mt-4 grid gap-2 sm:grid-cols-2">
+                            <a href="{{ route('player.join.success', $event->slug) }}" class="inline-flex items-center justify-center rounded-xl bg-white border border-amber-200 px-4 py-3 text-sm font-semibold text-amber-900 hover:bg-amber-100 transition-colors">
+                                Lihat Detail Pendaftaran
+                            </a>
+                            <form action="{{ route('player.join.cancel', $event->slug) }}" method="POST" class="">
+                                @csrf
+                                <button type="submit" class="w-full inline-flex items-center justify-center rounded-xl bg-rose-500 px-4 py-3 text-sm font-semibold text-white hover:bg-rose-600 transition-colors">
+                                    Batalkan Pendaftaran
+                                </button>
+                            </form>
+                        </div>
+                        <div class="mt-4 text-xs text-amber-700">
+                            <p><strong>Nama:</strong> {{ $pendingJoinPlayer->nama }}</p>
+                            <p><strong>Kontak:</strong> {{ $pendingJoinPlayer->kontak }}</p>
+                            <p><strong>Status Pembayaran:</strong> {{ ucfirst($pendingJoinPlayer->pivot->payment_status) }}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        @endif
+
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
             {{-- Left Column: Event Details --}}
@@ -279,7 +309,7 @@
                 @endif
 
                 {{-- Registration Form (mobile only) --}}
-                @if(!$isFull || $event->enable_waiting_list)
+                @if(empty($pendingJoinPlayer) && ($isFull === false || $event->enable_waiting_list))
                 <div class="pro-card p-6 lg:hidden">
                     <h3 class="text-lg font-semibold text-gray-900 mb-1">Isi Data Pemain</h3>
                     <p class="text-sm text-gray-500 mb-5">Masukkan nama dan kontak aktif untuk verifikasi.</p>
@@ -352,6 +382,7 @@
                             Saat ini ada <strong>{{ $waitingCount ?? 0 }}</strong> orang dalam antrian.
                             Setelah ada pembatalan, peserta teratas akan dihubungi untuk mengklaim slot.
                         </div>
+                        @if(empty($pendingJoinPlayer))
                         {{-- Desktop form still visible to allow joining into waiting list --}}
                         <div class="hidden lg:block mt-4">
                             @if(session('error'))
@@ -391,7 +422,9 @@
                                 </button>
                             </form>
                         </div>
+                        @endif
                     @else
+                        @if(empty($pendingJoinPlayer))
                         {{-- Desktop form --}}
                         <div class="hidden lg:block">
                             @if(session('error'))
@@ -432,6 +465,7 @@
                             </form>
                         </div>
                         <p class="text-xs text-gray-400 text-center mt-3">Sisa {{ $slotsLeft }} slot. Pembayaran via {{ strtolower($paymentLabel) }}.</p>
+                        @endif
                     @endif
                 </div>
 

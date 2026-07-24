@@ -149,6 +149,90 @@ class SuperAdminWaitlistReminderTest extends TestCase
         });
     }
 
+    public function test_super_admin_can_view_payment_reminder_page(): void
+    {
+        $superAdmin = User::factory()->create(['role' => 'superadmin']);
+
+        $event = Event::create([
+            'admin_id' => $superAdmin->id,
+            'nama_event' => 'Event Pembayaran Tertunda',
+            'tanggal' => now()->addDay()->toDateString(),
+            'waktu' => '20:00:00',
+            'tempat' => 'Lapangan Beta',
+            'slot_max' => 5,
+            'metode_pembayaran' => 'transfer',
+            'iuran_per_pemain' => 100000,
+            'biaya_total_event' => 500000,
+            'enable_waiting_list' => false,
+        ]);
+
+        $player = Player::create([
+            'nama' => 'Fajar',
+            'kontak' => '081222333444',
+        ]);
+
+        $event->players()->attach($player->id, [
+            'status_join' => 'joined',
+            'payment_method' => 'transfer',
+            'payment_amount' => 100000,
+            'payment_status' => 'pending',
+        ]);
+
+        $response = $this->actingAs($superAdmin)->get(route('superadmin.payment-reminders.index'));
+
+        $response->assertOk();
+        $response->assertSee('Reminder Pembayaran');
+        $response->assertSee('Fajar');
+        $response->assertSee('Rp 100.000');
+    }
+
+    public function test_super_admin_can_open_payment_reminder_in_whatsapp(): void
+    {
+        Mail::fake();
+
+        $superAdmin = User::factory()->create([
+            'role' => 'superadmin',
+            'email' => 'superadmin@example.com',
+        ]);
+
+        $event = Event::create([
+            'admin_id' => $superAdmin->id,
+            'nama_event' => 'Event Pembayaran Tertunda',
+            'tanggal' => now()->addDay()->toDateString(),
+            'waktu' => '20:00:00',
+            'tempat' => 'Lapangan Beta',
+            'slot_max' => 5,
+            'metode_pembayaran' => 'transfer',
+            'iuran_per_pemain' => 100000,
+            'biaya_total_event' => 500000,
+            'enable_waiting_list' => false,
+        ]);
+
+        $player = Player::create([
+            'nama' => 'Fajar',
+            'kontak' => '081222333444',
+        ]);
+
+        $event->players()->attach($player->id, [
+            'status_join' => 'joined',
+            'payment_method' => 'transfer',
+            'payment_amount' => 100000,
+            'payment_status' => 'pending',
+        ]);
+
+        $response = $this->actingAs($superAdmin)
+            ->get(route('superadmin.payment-reminders.remind', ['event' => $event, 'player' => $player]));
+
+        $response->assertRedirectContains('https://wa.me/6281222333444');
+        $response->assertSessionHas('success');
+
+        Mail::assertSent(\App\Mail\PaymentReminderAlertMail::class, function ($mail) use ($superAdmin, $event, $player) {
+            return $mail->hasTo($superAdmin->email) &&
+                $mail->event->id === $event->id &&
+                $mail->player->id === $player->id;
+        });
+    }
+
     public function test_new_registration_is_forced_into_waitlist_when_only_one_slot_remains(): void
     {
         $event = Event::create([

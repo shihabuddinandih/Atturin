@@ -23,6 +23,7 @@ class PlayerJoinController extends Controller
 
         $pendingCookieName = 'pending_payment_' . $event->id;
         $pendingJoin = json_decode($request->cookie($pendingCookieName), true);
+        $pendingJoinPlayer = null;
 
         if (is_array($pendingJoin)
             && isset($pendingJoin['event_id'], $pendingJoin['player_id'])
@@ -30,7 +31,7 @@ class PlayerJoinController extends Controller
         ) {
             $pendingPlayer = $event->players()->where('players.id', $pendingJoin['player_id'])->first();
             if ($pendingPlayer && $pendingPlayer->pivot->payment_status !== 'paid') {
-                return redirect()->route('player.join.success', $event->slug);
+                $pendingJoinPlayer = $pendingPlayer;
             }
         }
 
@@ -102,12 +103,24 @@ class PlayerJoinController extends Controller
 
         $waitingCount = $event->waitlists()->where('status','waiting')->count();
 
-        return view('player.join.show', compact('event', 'isFull', 'joinedCount', 'joinedPlayers', 'rolesWithAvailability', 'waitingCount'));
+        return view('player.join.show', compact('event', 'isFull', 'joinedCount', 'joinedPlayers', 'rolesWithAvailability', 'waitingCount', 'pendingJoinPlayer'));
     }
 
     public function store(Request $request, $slug, \App\Services\EventService $eventService)
     {
         $event = Event::where('slug', $slug)->firstOrFail();
+
+        $pendingCookieName = 'pending_payment_' . $event->id;
+        $pendingJoin = json_decode($request->cookie($pendingCookieName), true);
+        if (is_array($pendingJoin)
+            && isset($pendingJoin['event_id'], $pendingJoin['player_id'])
+            && (int) $pendingJoin['event_id'] === (int) $event->id
+        ) {
+            $pendingPlayer = $event->players()->where('players.id', $pendingJoin['player_id'])->first();
+            if ($pendingPlayer && $pendingPlayer->pivot->payment_status !== 'paid') {
+                return back()->withInput()->with('error', 'Anda sudah memiliki pendaftaran tertunda pada event ini. Selesaikan pembayaran atau batalkan pendaftaran sebelumnya terlebih dahulu.');
+            }
+        }
 
         $joinedCount = $event->players()->wherePivot('status_join', 'joined')->count();
         $waitingCount = $event->waitlists()->where('status', 'waiting')->count();
@@ -287,9 +300,9 @@ class PlayerJoinController extends Controller
 
         $fee = $baseFee + $adminFee;
 
-        // Jika player sudah pernah join dan batal, masih tunggu pembayaran sebelum status jadi joined
+        // Registrasi langsung disimpan sebagai joined; peserta dapat menyelesaikan pembayaran nanti.
         $paymentPayload = [
-            'status_join' => 'batal',
+            'status_join' => 'joined',
             'hadir' => false,
             'payment_method' => $event->metode_pembayaran,
             'payment_amount' => $fee,
@@ -315,12 +328,14 @@ class PlayerJoinController extends Controller
             ],
         ]);
 
-        // set pending cookie to expire in 3 minutes (matching QR expiry)
+        $eventStart = Carbon::parse($event->tanggal->format('Y-m-d') . ' ' . $event->waktu);
+        $cookieMinutes = max(60, min(10080, now()->diffInMinutes($eventStart) + 1440));
+
         return redirect()->route('player.join.success', $event->slug)
             ->withCookie(cookie('pending_payment_' . $event->id, json_encode([
                 'event_id' => $event->id,
                 'player_id' => $player->id,
-            ]), 3));
+            ]), $cookieMinutes));
     }
 
     public function success(Request $request, $slug)
@@ -608,8 +623,11 @@ class PlayerJoinController extends Controller
             'payment_paid_at' => $newStatus === 'paid' ? now() : null,
             'payment_expires_at' => $newStatus === 'paid' ? null : $player->pivot->payment_expires_at,
             'payment_snap_token' => $newStatus === 'paid' ? null : $player->pivot->payment_snap_token,
-            'status_join' => $newStatus === 'paid' ? 'joined' : ($newStatus === 'failed' ? 'batal' : $player->pivot->status_join),
         ];
+
+        if ($newStatus === 'paid') {
+            $updatePayload['status_join'] = 'joined';
+        }
 
         // If the order id doesn't match the current player's pivot, attempt to find the player by order id
         $targetPlayer = $player;
