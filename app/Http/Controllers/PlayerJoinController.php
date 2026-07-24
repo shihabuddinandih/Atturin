@@ -4,6 +4,9 @@ namespace App\Http\Controllers;
 
 use App\Models\Event;
 use App\Models\Player;
+use App\Models\EventWaitlist;
+use App\Jobs\SendWaitlistOfferJob;
+use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -26,7 +29,7 @@ class PlayerJoinController extends Controller
             && (int) $pendingJoin['event_id'] === (int) $event->id
         ) {
             $pendingPlayer = $event->players()->where('players.id', $pendingJoin['player_id'])->first();
-            if ($pendingPlayer && $pendingPlayer->pivot->payment_method === 'online_banking' && $pendingPlayer->pivot->payment_status !== 'paid') {
+            if ($pendingPlayer && $pendingPlayer->pivot->payment_status !== 'paid') {
                 return redirect()->route('player.join.success', $event->slug);
             }
         }
@@ -97,7 +100,9 @@ class PlayerJoinController extends Controller
                 ->get(['players.id', 'players.nama', 'players.kontak']);
         }
 
-        return view('player.join.show', compact('event', 'isFull', 'joinedCount', 'joinedPlayers', 'rolesWithAvailability'));
+        $waitingCount = $event->waitlists()->where('status','waiting')->count();
+
+        return view('player.join.show', compact('event', 'isFull', 'joinedCount', 'joinedPlayers', 'rolesWithAvailability', 'waitingCount'));
     }
 
     public function store(Request $request, $slug, \App\Services\EventService $eventService)
@@ -105,7 +110,113 @@ class PlayerJoinController extends Controller
         $event = Event::where('slug', $slug)->firstOrFail();
 
         $joinedCount = $event->players()->wherePivot('status_join', 'joined')->count();
-        if ($joinedCount >= $event->slot_max) {
+        $waitingCount = $event->waitlists()->where('status', 'waiting')->count();
+        $availableSlots = max(0, (int) $event->slot_max - $joinedCount);
+        $isFull = $joinedCount >= $event->slot_max;
+        $hasWaitingList = $event->enable_waiting_list && ($waitingCount > 0 || $availableSlots <= 1);
+        $shouldUseWaitlist = $event->enable_waiting_list && ($isFull || $hasWaitingList);
+
+        $computeAdminFee = function (float $base, string $method) {
+            if ($method !== 'online_banking') {
+                return 0;
+            }
+            if ($base <= 49000) {
+                return 1500;
+            }
+            if ($base <= 99000) {
+                return 3000;
+            }
+            return (int) round($base * 0.03);
+        };
+
+        if ($shouldUseWaitlist) {
+            if ($event->enable_waiting_list) {
+                $rules = [
+                    'nama' => 'required|string|max:255',
+                    'kontak' => 'required|string|max:255',
+                ];
+
+                if ($event->skema_iuran === 'custom') {
+                    $roleNames = array_column($event->roles ?? [], 'name');
+                    $rules['role_name'] = ['required', 'string', Rule::in($roleNames)];
+                }
+
+                $validated = $request->validate($rules);
+
+                // Find or create player record
+                $player = Player::firstOrCreate(
+                    ['kontak' => $validated['kontak']],
+                    ['nama' => $validated['nama']]
+                );
+
+                if ($player->nama !== $validated['nama']) {
+                    $player->update(['nama' => $validated['nama']]);
+                }
+
+                $roleName = null;
+                $paymentAmount = (float) $event->iuran_per_pemain;
+
+                if ($event->skema_iuran === 'custom') {
+                    $roleName = $validated['role_name'];
+                    $selectedRole = collect($event->roles ?? [])->firstWhere('name', $roleName);
+                    if ($selectedRole) {
+                        $paymentAmount = (float) ($selectedRole['price'] ?? $event->iuran_per_pemain);
+                    }
+                } elseif ($event->skema_iuran === 'loyalitas') {
+                    $paymentAmount = (float) $eventService->calculateLoyaltyFee($event, $validated['kontak']);
+                }
+
+                $paymentAmount += $computeAdminFee($paymentAmount, $event->metode_pembayaran);
+
+                $existing = EventWaitlist::where('event_id', $event->id)
+                    ->where(function ($q) use ($player, $validated) {
+                        $q->where('player_id', $player->id);
+                        if (!empty($validated['kontak'])) {
+                            $q->orWhere('phone', $validated['kontak']);
+                        }
+                    })->first();
+
+                if (!$existing) {
+                    EventWaitlist::create([
+                        'event_id' => $event->id,
+                        'player_id' => $player->id,
+                        'phone' => $player->kontak,
+                        'role_name' => $roleName,
+                        'payment_amount' => $paymentAmount,
+                        'status' => 'waiting',
+                    ]);
+                } else {
+                    $existing->update([
+                        'role_name' => $roleName,
+                        'payment_amount' => $paymentAmount,
+                        'status' => 'waiting',
+                    ]);
+                }
+
+                $position = EventWaitlist::where('event_id', $event->id)->where('status','waiting')->count();
+
+                $reasonParts = [];
+                if ($isFull) {
+                    $reasonParts[] = 'event sudah penuh';
+                }
+                if ($availableSlots <= 1 && !$isFull) {
+                    $reasonParts[] = 'slot tersisa 1';
+                }
+                if ($waitingCount > 0) {
+                    $reasonParts[] = 'sudah ada waiting list';
+                }
+
+                if (empty($reasonParts)) {
+                    $reasonParts[] = 'event sedang menggunakan sistem antrean';
+                }
+
+                $reasonText = count($reasonParts) === 1
+                    ? $reasonParts[0]
+                    : implode(' dan ', $reasonParts);
+
+                return back()->with('info', "Pendaftaran Anda diarahkan ke waiting list karena {$reasonText}. Anda berada di posisi {$position}.");
+            }
+
             return back()->with('error', 'Maaf, slot pertandingan sudah penuh.');
         }
 
@@ -318,7 +429,15 @@ class PlayerJoinController extends Controller
 
             // Only cancel if payment is still pending — do not cancel a paid registration
             if ($player && $player->pivot->payment_status !== 'paid') {
-                $event->players()->detach($playerId);
+                DB::transaction(function () use ($event, $playerId) {
+                    $event->players()->detach($playerId);
+
+                    // Promote next waiting list entry to a reminder-ready state for manual follow-up.
+                    $next = $event->waitlists()->where('status','waiting')->oldest()->first();
+                    if ($next) {
+                        SendWaitlistOfferJob::dispatch($next);
+                    }
+                });
             }
         }
 
@@ -489,11 +608,8 @@ class PlayerJoinController extends Controller
             'payment_paid_at' => $newStatus === 'paid' ? now() : null,
             'payment_expires_at' => $newStatus === 'paid' ? null : $player->pivot->payment_expires_at,
             'payment_snap_token' => $newStatus === 'paid' ? null : $player->pivot->payment_snap_token,
+            'status_join' => $newStatus === 'paid' ? 'joined' : ($newStatus === 'failed' ? 'batal' : $player->pivot->status_join),
         ];
-
-        if ($newStatus === 'paid') {
-            $updatePayload['status_join'] = 'joined';
-        }
 
         // If the order id doesn't match the current player's pivot, attempt to find the player by order id
         $targetPlayer = $player;

@@ -27,6 +27,7 @@ class Event extends Model
         'facilities',
         'skema_iuran',
         'roles',
+        'enable_waiting_list',
         'show_joined_players_public',
         'show_joined_player_contacts_public',
         'slug',
@@ -43,8 +44,17 @@ class Event extends Model
         'required_fields' => 'array',
         'roles' => 'array',
         'facilities' => 'array',
+        'enable_waiting_list' => 'boolean',
         'tanggal' => 'date',
     ];
+
+    /**
+     * Waiting list entries for this event.
+     */
+    public function waitlists()
+    {
+        return $this->hasMany(EventWaitlist::class, 'event_id');
+    }
 
     protected static function booted(): void
     {

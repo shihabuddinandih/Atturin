@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Enums\JoinStatus;
 use App\Enums\PaymentStatus;
+use App\Jobs\SendWaitlistOfferJob;
 use App\Models\Event;
 use App\Services\EventService;
 use Illuminate\Http\Request;
@@ -52,6 +53,7 @@ class AdminEventController extends Controller
             'facilities.*' => 'nullable|string|max:255',
             'show_joined_players_public' => 'nullable|boolean',
             'show_joined_player_contacts_public' => 'nullable|boolean',
+            'enable_waiting_list' => 'nullable|boolean',
             'banner_image' => 'nullable|image|max:2048',
         ]);
 
@@ -184,9 +186,19 @@ class AdminEventController extends Controller
             'status_join' => 'required|in:' . implode(',', array_column(JoinStatus::cases(), 'value'))
         ]);
 
-        $event->players()->updateExistingPivot($playerId, [
-            'status_join' => $validated['status_join']
-        ]);
+        $player = $event->players()->where('players.id', $playerId)->first();
+        if ($player) {
+            $previousStatus = $player->pivot->status_join;
+            $newStatus = $validated['status_join'];
+
+            $event->players()->updateExistingPivot($playerId, [
+                'status_join' => $newStatus
+            ]);
+
+            if ($previousStatus === 'joined' && $newStatus !== 'joined') {
+                $this->promoteNextWaitingPlayer($event);
+            }
+        }
 
         if ($request->expectsJson()) {
             return response()->json([
@@ -233,7 +245,14 @@ class AdminEventController extends Controller
             $payload['status_join'] = 'batal';
         }
 
+        $player = $event->players()->where('players.id', $playerId)->first();
+        $previousStatusJoin = $player?->pivot->status_join;
+
         $event->players()->updateExistingPivot($playerId, $payload);
+
+        if ($previousStatusJoin === 'joined' && ($payload['status_join'] ?? $previousStatusJoin) !== 'joined') {
+            $this->promoteNextWaitingPlayer($event);
+        }
 
         if ($request->expectsJson()) {
             return response()->json([
@@ -243,5 +262,17 @@ class AdminEventController extends Controller
         }
 
         return back()->with('success', 'Status pembayaran berhasil diupdate.');
+    }
+
+    private function promoteNextWaitingPlayer(Event $event): void
+    {
+        if (! $event->enable_waiting_list) {
+            return;
+        }
+
+        $next = $event->waitlists()->where('status', 'waiting')->oldest()->first();
+        if ($next) {
+            SendWaitlistOfferJob::dispatch($next);
+        }
     }
 }

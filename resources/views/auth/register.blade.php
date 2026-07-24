@@ -38,13 +38,13 @@
                         <p class="text-xs text-gray-400 mt-0.5">Buat dan kelola event</p>
                     </div>
                 </label>
-                <label class="flex items-start p-4 border-2 border-white/10 bg-white/5 rounded-xl cursor-pointer transition-all duration-200 hover:border-lime-400/50 hover:bg-white/10 @if(old('role') === 'player') border-lime-400 bg-lime-400/10 @endif">
+                <!-- <label class="flex items-start p-4 border-2 border-white/10 bg-white/5 rounded-xl cursor-pointer transition-all duration-200 hover:border-lime-400/50 hover:bg-white/10 @if(old('role') === 'player') border-lime-400 bg-lime-400/10 @endif">
                     <input type="radio" name="role" value="player" {{ old('role') === 'player' ? 'checked' : '' }} class="mt-0.5 w-5 h-5 text-lime-400 bg-white/5 border-white/20 focus:ring-offset-0 focus:ring-lime-400/30" required>
                     <div class="ms-3 flex-1">
                         <p class="font-semibold text-white">Player</p>
                         <p class="text-xs text-gray-400 mt-0.5">Bergabung dan ikuti event</p>
                     </div>
-                </label>
+                </label> -->
             </div>
             @error('role')
                 <p class="mt-1.5 text-xs text-rose-400 font-medium">{{ $message }}</p>

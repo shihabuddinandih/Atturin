@@ -7,6 +7,7 @@ use App\Http\Controllers\AdminMemberController;
 use App\Http\Controllers\AdminSettingsController;
 use App\Http\Controllers\PlayerJoinController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\SuperAdminWaitlistReminderController;
 use App\Http\Controllers\SuperAdminWithdrawalController;
 use Illuminate\Support\Facades\Route;
 
@@ -60,6 +61,9 @@ Route::middleware(['auth', 'superadmin'])->prefix('superadmin')->name('superadmi
     Route::get('withdrawals', [SuperAdminWithdrawalController::class, 'index'])->name('withdrawals.index');
     Route::post('withdrawals/{withdrawal}/approve', [SuperAdminWithdrawalController::class, 'approve'])->name('withdrawals.approve');
     Route::post('withdrawals/{withdrawal}/reject', [SuperAdminWithdrawalController::class, 'reject'])->name('withdrawals.reject');
+
+    Route::get('waitlist-reminders', [SuperAdminWaitlistReminderController::class, 'index'])->name('waitlist-reminders.index');
+    Route::get('waitlist-reminders/{waitlist}/remind', [SuperAdminWaitlistReminderController::class, 'remind'])->name('waitlist-reminders.remind');
 });
 
 Route::get('/join/{slug}', [PlayerJoinController::class, 'show'])->name('player.join.show');

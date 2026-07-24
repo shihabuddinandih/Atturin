@@ -130,6 +130,7 @@ class EventService
         $paidCount = $players->where('payment_status', PaymentStatus::PAID->value)->count();
         $pendingCount = $players->where('payment_status', PaymentStatus::PENDING->value)->count();
         $failedCount = $players->where('payment_status', PaymentStatus::FAILED->value)->count();
+        $waitingCount = $event->waitlists()->where('status','waiting')->count();
         $baseAmount = function (array $player): float {
             $amt = (float) $player['payment_amount'];
             if ($player['payment_method'] !== 'online_banking') {
@@ -147,6 +148,7 @@ class EventService
             'metrics' => [
                 'joined_count' => $joinedCount,
                 'slot_max' => $event->slot_max,
+                'waiting_count' => $waitingCount,
                 'paid_count' => $paidCount,
                 'pending_count' => $pendingCount,
                 'failed_count' => $failedCount,

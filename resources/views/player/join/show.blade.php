@@ -38,7 +38,7 @@
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex items-center justify-between h-14">
                 <img src="{{ asset('images/Logo/Horizontal/Secondary.png') }}" class="h-8 object-contain" alt="{{ config('app.name', 'Atturin') }}">
-                <div class="hidden md:flex items-center gap-6 text-sm font-medium text-slate-300">
+                <!-- <div class="hidden md:flex items-center gap-6 text-sm font-medium text-slate-300">
                     <a href="#" class="text-lime-400 border-b-2 border-lime-400 pb-0.5 font-semibold">Events</a>
                     <a href="#" class="hover:text-white transition-colors">My Schedule</a>
                     <a href="#" class="hover:text-white transition-colors">Teams</a>
@@ -47,7 +47,7 @@
                 <div class="flex items-center gap-3">
                     <button class="hidden sm:inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-gradient-to-r from-lime-400 to-lime-500 hover:from-lime-300 hover:to-lime-400 text-slate-950 text-xs font-bold transition-all shadow-md shadow-lime-500/15">Create Event</button>
                     <div class="w-8 h-8 rounded-full bg-gradient-to-br from-brand-500 to-brand-700 flex items-center justify-center text-white text-xs font-bold">P</div>
-                </div>
+                </div> -->
             </div>
         </div>
     </nav>
@@ -132,7 +132,7 @@
 
                         {{-- Top-left: Status badge --}}
                         <span class="absolute top-4 left-4 z-10 px-3 py-1 rounded-lg text-xs font-bold {{ $isFull ? 'bg-rose-500 text-white' : 'bg-lime-400 text-brand-900' }}">
-                            {{ $isFull ? '✕ Full' : '⚡ Terbuka' }}
+                            {{ $isFull ? '✕ Full' : 'Terbuka' }}
                         </span>
 
                         {{-- Bottom-left: Date & Time prominent pill --}}
@@ -279,7 +279,7 @@
                 @endif
 
                 {{-- Registration Form (mobile only) --}}
-                @if(!$isFull)
+                @if(!$isFull || $event->enable_waiting_list)
                 <div class="pro-card p-6 lg:hidden">
                     <h3 class="text-lg font-semibold text-gray-900 mb-1">Isi Data Pemain</h3>
                     <p class="text-sm text-gray-500 mb-5">Masukkan nama dan kontak aktif untuk verifikasi.</p>
@@ -342,9 +342,54 @@
                         <div class="h-full rounded-full transition-all duration-500 {{ $isFull ? 'bg-rose-500' : 'bg-lime-400' }}" style="{{ 'width: '.$slotPercentage.'%;' }}"></div>
                     </div>
 
-                    @if($isFull)
+                    @if($isFull && !$event->enable_waiting_list)
                         <div class="rounded-xl bg-rose-50 border border-rose-200 px-4 py-3 text-sm text-rose-700">
                             Slot sudah penuh. Pantau info admin untuk jadwal berikutnya.
+                        </div>
+                    @elseif($isFull && $event->enable_waiting_list)
+                        <div class="rounded-xl bg-blue-50 border border-blue-200 px-4 py-3 text-sm text-blue-700">
+                            Slot sudah penuh, namun pendaftaran masih dibuka untuk <strong>waiting list</strong>.
+                            Saat ini ada <strong>{{ $waitingCount ?? 0 }}</strong> orang dalam antrian.
+                            Setelah ada pembatalan, peserta teratas akan dihubungi untuk mengklaim slot.
+                        </div>
+                        {{-- Desktop form still visible to allow joining into waiting list --}}
+                        <div class="hidden lg:block mt-4">
+                            @if(session('error'))
+                                <div class="mb-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{{ session('error') }}</div>
+                            @endif
+                            <form action="{{ route('player.join.store', $event->slug) }}" method="POST" class="space-y-3">
+                                @csrf
+                                @if($isCustomEvent)
+                                    <div>
+                                        <label for="role_desktop" class="block text-sm font-medium text-gray-700 mb-1.5">Pilih Role</label>
+                                        <select id="role_desktop" name="role_name" required
+                                                class="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm focus:border-brand-500 focus:ring-2 focus:ring-brand-500/10 bg-white">
+                                            <option value="">Pilih role...</option>
+                                            @foreach($customRoles as $role)
+                                                @php
+                                                    $rolePrice = (float) ($role['price'] ?? 0);
+                                                    $optDisplay = $role['display_price'] ?? ($rolePrice + $computeAdminFee($rolePrice, $event->metode_pembayaran));
+                                                @endphp
+                                                <option value="{{ $role['name'] }}" {{ old('role_name') === $role['name'] ? 'selected' : '' }} @if(!empty($role['is_full'])) disabled @endif>
+                                                    {{ $role['name'] }} — Rp {{ number_format($optDisplay, 0, ',', '.') }} ({{ $role['slots'] }} slot) @if(!empty($role['is_full'])) - Penuh @endif
+                                                </option>
+                                            @endforeach
+                                        </select>
+                                        @error('role_name')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror
+                                    </div>
+                                @endif
+                                <input name="nama" type="text" required value="{{ old('nama') }}" placeholder="Nama lengkap"
+                                       class="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm focus:border-brand-500 focus:ring-2 focus:ring-brand-500/10">
+                                @error('nama')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror
+                                <input name="kontak" type="text" required value="{{ old('kontak') }}" placeholder="No. WhatsApp"
+                                       class="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm focus:border-brand-500 focus:ring-2 focus:ring-brand-500/10">
+                                @error('kontak')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror
+                                <p class="text-[10px] text-slate-500 mt-2">Dengan mendaftar saat event penuh, Anda akan ditempatkan pada waiting list. Kami akan menghubungi jika slot tersedia.</p>
+                                <button type="submit" class="w-full py-3 rounded-xl bg-lime-400 hover:bg-lime-500 text-brand-900 font-bold text-sm transition-all shadow-lg shadow-lime-400/20 flex items-center justify-center gap-2">
+                                    Masuk Waiting List
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
+                                </button>
+                            </form>
                         </div>
                     @else
                         {{-- Desktop form --}}

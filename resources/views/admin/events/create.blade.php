@@ -121,6 +121,19 @@
                                required placeholder="Cth: 15">
                     </div>
 
+                    <!-- <div>
+                        <input type="hidden" name="enable_waiting_list" value="0">
+                        <label class="flex items-start gap-3 p-3 rounded-xl border border-gray-100 hover:border-brand-200 hover:bg-brand-50/30 transition-all cursor-pointer">
+                            <input type="checkbox" name="enable_waiting_list" id="enable_waiting_list" value="1"
+                                   class="mt-0.5 h-4 w-4 rounded border-gray-300 text-brand-500 focus:ring-brand-500"
+                                   {{ old('enable_waiting_list') == '1' ? 'checked' : '' }}>
+                            <span>
+                                <span class="block text-sm font-medium text-gray-800">Aktifkan Waiting List</span>
+                                <span class="block text-xs text-gray-400 mt-0.5">Jika aktif, peserta akan masuk waiting list ketika slot sudah penuh.</span>
+                            </span>
+                        </label>
+                    </div> -->
+
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1.5">Fasilitas Event</label>
                         <div id="facilities-list" class="space-y-3">
