@@ -316,10 +316,14 @@ class PlayerJoinController extends Controller
         }
 
         if ($existingPlayer) {
+            $paymentPayload['registration_token'] = $existingPlayer->pivot->registration_token ?: Str::random(40);
             $event->players()->updateExistingPivot($player->id, $paymentPayload);
         } else {
+            $paymentPayload['registration_token'] = Str::random(40);
             $event->players()->attach($player->id, $paymentPayload);
         }
+
+        $registrationToken = $paymentPayload['registration_token'];
 
         session([
             'join_context' => [
@@ -331,7 +335,9 @@ class PlayerJoinController extends Controller
         $eventStart = Carbon::parse($event->tanggal->format('Y-m-d') . ' ' . $event->waktu);
         $cookieMinutes = max(60, min(10080, now()->diffInMinutes($eventStart) + 1440));
 
-        return redirect()->route('player.join.success', $event->slug)
+        \App\Jobs\SendRegistrationConfirmationJob::dispatch($event->id, $player->id, $registrationToken);
+
+        return redirect()->route('registration.show', $registrationToken)
             ->withCookie(cookie('pending_payment_' . $event->id, json_encode([
                 'event_id' => $event->id,
                 'player_id' => $player->id,

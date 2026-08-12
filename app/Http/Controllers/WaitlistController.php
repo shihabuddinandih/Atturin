@@ -2,10 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use App\Jobs\SendRegistrationConfirmationJob;
 use App\Models\EventWaitlist;
 use App\Models\Player;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class WaitlistController extends Controller
 {
@@ -43,6 +45,8 @@ class WaitlistController extends Controller
                     );
                 }
 
+                $existingRegistration = $event->players()->where('players.id', $player->id)->first();
+
                 $payload = [
                     'status_join' => 'joined',
                     'hadir' => false,
@@ -53,10 +57,12 @@ class WaitlistController extends Controller
                     'payment_paid_at' => null,
                     'payment_expires_at' => null,
                     'payment_snap_token' => null,
+                    'registration_token' => $existingRegistration && $existingRegistration->pivot->registration_token
+                        ? $existingRegistration->pivot->registration_token
+                        : Str::random(40),
                 ];
 
-                $exists = $event->players()->where('players.id', $player->id)->exists();
-                if ($exists) {
+                if ($existingRegistration) {
                     $event->players()->updateExistingPivot($player->id, $payload);
                 } else {
                     $event->players()->attach($player->id, $payload);
@@ -71,8 +77,10 @@ class WaitlistController extends Controller
                 ];
                 session(['join_context' => $joinContext]);
 
+                SendRegistrationConfirmationJob::dispatch($event->id, $player->id, $payload['registration_token']);
+
                 $pendingCookieName = 'pending_payment_' . $event->id;
-                $response = redirect()->route('player.join.success', $event->slug)
+                $response = redirect()->route('registration.show', $payload['registration_token'])
                     ->with('success', 'Slot waiting list Anda berhasil diklaim. Silakan selesaikan pembayaran untuk mengamankan tempat.')
                     ->withCookie(cookie($pendingCookieName, json_encode($joinContext), 3));
             }

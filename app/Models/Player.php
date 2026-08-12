@@ -21,6 +21,8 @@ class Player extends Model
     public function events()
     {
         return $this->belongsToMany(Event::class, 'event_player', 'player_id', 'event_id')->withPivot(
+            'registration_token',
+            'confirmation_sent_at',
             'status_join',
             'hadir',
             'payment_method',

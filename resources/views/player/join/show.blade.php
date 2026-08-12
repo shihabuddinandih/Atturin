@@ -114,10 +114,10 @@
                         <p class="font-semibold text-amber-900">Anda memiliki pendaftaran tertunda untuk event ini.</p>
                         <p class="mt-2 text-[13px] text-amber-700">Silakan selesaikan pembayaran atau batalkan pendaftaran sebelum membuat pendaftaran baru.</p>
                         <div class="mt-4 grid gap-2 sm:grid-cols-2">
-                            <a href="{{ route('player.join.success', $event->slug) }}" class="inline-flex items-center justify-center rounded-xl bg-white border border-amber-200 px-4 py-3 text-sm font-semibold text-amber-900 hover:bg-amber-100 transition-colors">
+                            <a href="{{ $pendingJoinPlayer->pivot->registration_token ? route('registration.show', $pendingJoinPlayer->pivot->registration_token) : route('player.join.success', $event->slug) }}" class="inline-flex items-center justify-center rounded-xl bg-white border border-amber-200 px-4 py-3 text-sm font-semibold text-amber-900 hover:bg-amber-100 transition-colors">
                                 Lihat Detail Pendaftaran
                             </a>
-                            <form action="{{ route('player.join.cancel', $event->slug) }}" method="POST" class="">
+                            <form action="{{ $pendingJoinPlayer->pivot->registration_token ? route('registration.cancel', $pendingJoinPlayer->pivot->registration_token) : route('player.join.cancel', $event->slug) }}" method="POST" class="">
                                 @csrf
                                 <button type="submit" class="w-full inline-flex items-center justify-center rounded-xl bg-rose-500 px-4 py-3 text-sm font-semibold text-white hover:bg-rose-600 transition-colors">
                                     Batalkan Pendaftaran

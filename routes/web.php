@@ -7,6 +7,7 @@ use App\Http\Controllers\AdminMemberController;
 use App\Http\Controllers\AdminSettingsController;
 use App\Http\Controllers\PlayerJoinController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\RegistrationController;
 use App\Http\Controllers\SuperAdminPaymentReminderController;
 use App\Http\Controllers\SuperAdminWaitlistReminderController;
 use App\Http\Controllers\SuperAdminWithdrawalController;
@@ -68,6 +69,9 @@ Route::middleware(['auth', 'superadmin'])->prefix('superadmin')->name('superadmi
 
     Route::get('payment-reminders', [SuperAdminPaymentReminderController::class, 'index'])->name('payment-reminders.index');
     Route::get('payment-reminders/{event}/{player}/remind', [SuperAdminPaymentReminderController::class, 'remind'])->name('payment-reminders.remind');
+
+    Route::get('registration-confirmations', [\App\Http\Controllers\SuperAdminRegistrationConfirmationController::class, 'index'])->name('registration-confirmations.index');
+    Route::get('registration-confirmations/{event}/{player}/send', [\App\Http\Controllers\SuperAdminRegistrationConfirmationController::class, 'send'])->name('registration-confirmations.send');
 });
 
 Route::get('/join/{slug}', [PlayerJoinController::class, 'show'])->name('player.join.show');
@@ -81,6 +85,14 @@ Route::post('/join/{slug}/cancel', [PlayerJoinController::class, 'cancel'])->nam
 
 // Waiting list claim (public)
 Route::get('/waitlist/claim/{token}', [\App\Http\Controllers\WaitlistController::class, 'claim'])->name('waitlist.claim');
+
+// Durable, device-independent registration link (shareable via WhatsApp)
+Route::get('/r/{token}', [RegistrationController::class, 'show'])->name('registration.show');
+Route::post('/r/{token}/midtrans/token', [RegistrationController::class, 'midtransToken'])->name('registration.midtrans.token');
+Route::post('/r/{token}/midtrans/finish', [RegistrationController::class, 'midtransFinish'])->name('registration.midtrans.finish');
+Route::post('/r/{token}/midtrans/status', [RegistrationController::class, 'midtransStatus'])->name('registration.midtrans.status');
+Route::post('/r/{token}/simulate-payment', [RegistrationController::class, 'simulatePayment'])->name('registration.simulatePayment');
+Route::post('/r/{token}/cancel', [RegistrationController::class, 'cancel'])->name('registration.cancel');
 
 Route::get('/dashboard', function () {
     return view('dashboard');
