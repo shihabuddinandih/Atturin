@@ -70,11 +70,7 @@
                                 <span class="text-gray-600 font-medium">{{ $role['name'] }}
                                     <span class="text-gray-400 font-normal">({{ $role['slots'] }} slot)</span>
                                 </span>
-                                <span class="font-semibold text-gray-800">Rp {{ number_format((float)($role['price'] ?? 0), 0, ',', '.') }}
-                                    @if($event->metode_pembayaran === 'online_banking')
-                                        <span class="text-amber-500 font-normal">+admin</span>
-                                    @endif
-                                </span>
+                                <span class="font-semibold text-gray-800">Rp {{ number_format((float)($role['price'] ?? 0), 0, ',', '.') }}</span>
                             </div>
                         @endforeach
                     </div>
@@ -97,9 +93,20 @@
     @if(!empty($event->facilities) && is_array($event->facilities))
         <div class="pro-card p-5">
             <div class="text-[11px] font-bold uppercase tracking-wider text-gray-400 mb-2">Fasilitas Event</div>
-            <div class="flex flex-wrap gap-2">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 @foreach($event->facilities as $facility)
-                    <span class="inline-flex items-center rounded-full bg-brand-50 px-3 py-1 text-xs font-semibold text-brand-700 border border-brand-100">{{ $facility }}</span>
+                    @php
+                        $facilityKey = is_array($facility) ? ($facility['key'] ?? null) : null;
+                        $facilityLabel = $facilityKey ? \App\Support\FacilityCatalog::label($facilityKey) : (is_string($facility) ? $facility : '');
+                        $facilityNote = is_array($facility) ? ($facility['note'] ?? null) : null;
+                        $facilityIcon = $facilityKey ? \App\Support\FacilityCatalog::icon($facilityKey) : null;
+                    @endphp
+                    <div class="flex items-center gap-2.5 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2">
+                        <span class="w-7 h-7 rounded-lg bg-brand-50 flex items-center justify-center text-brand-500 flex-shrink-0">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">{!! $facilityIcon ?? \App\Support\FacilityCatalog::icon('') !!}</svg>
+                        </span>
+                        <span class="text-xs font-medium text-gray-800">{{ $facilityLabel }}@if($facilityNote) <span class="text-gray-500">({{ $facilityNote }})</span>@endif</span>
+                    </div>
                 @endforeach
             </div>
         </div>
@@ -171,7 +178,7 @@
         <div class="px-6 py-4 border-b border-gray-100 flex flex-wrap items-center justify-between gap-3">
             <div>
                 <h3 class="text-base font-semibold text-gray-900">Daftar Peserta</h3>
-                <p class="text-xs text-gray-400 mt-0.5">Update status join, kehadiran, dan pembayaran tanpa refresh.</p>
+                <p class="text-xs text-gray-400 mt-0.5">Pantau status join dan pembayaran peserta secara realtime.</p>
             </div>
             <div class="text-xs text-gray-400 flex items-center gap-1.5">
                 <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
@@ -189,7 +196,6 @@
                         <th class="px-6 py-3 text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Peserta</th>
                         <th class="px-6 py-3 text-center text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Waktu Join</th>
                         <th class="px-6 py-3 text-center text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Status Join</th>
-                        <th class="px-6 py-3 text-center text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Hadir</th>
                         <th class="px-6 py-3 text-center text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Pembayaran</th>
                     </tr>
                 </thead>
@@ -208,30 +214,15 @@
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap text-xs text-gray-400 text-center">{{ $player['joined_at_human'] }}</td>
                             <td class="px-6 py-4 whitespace-nowrap text-center">
-                                <form action="{{ route('admin.events.updateStatus', [$event->id, $player['id']]) }}" method="POST" data-ajax="true">
-                                    @csrf
-                                    <select name="status_join" class="text-xs rounded-lg border-gray-200 py-1.5 {{ $player['status_join'] === 'joined' ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700' }}">
-                                        <option value="joined" {{ $player['status_join'] === 'joined' ? 'selected' : '' }}>Joined</option>
-                                        <option value="batal" {{ $player['status_join'] === 'batal' ? 'selected' : '' }}>Batal</option>
-                                    </select>
-                                </form>
-                            </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-center">
-                                <form action="{{ route('admin.events.updateAttendance', [$event->id, $player['id']]) }}" method="POST" data-ajax="true">
-                                    @csrf
-                                    <input type="checkbox" name="hadir" value="1" class="h-5 w-5 text-brand-500 rounded border-gray-300 focus:ring-brand-500 cursor-pointer" {{ $player['hadir'] ? 'checked' : '' }}>
-                                </form>
+                                <span class="inline-block text-xs font-semibold rounded-lg px-2.5 py-1.5 {{ $player['status_join'] === 'joined' ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700' }}">
+                                    {{ $player['status_join'] === 'joined' ? 'Joined' : 'Batal' }}
+                                </span>
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap text-center text-xs text-gray-600">
                                 <div class="mb-2">{{ $player['payment_method_label'] }} <span class="font-semibold">- Rp {{ number_format((float) $player['payment_amount'], 0, ',', '.') }}</span></div>
-                                <form action="{{ route('admin.events.updatePayment', [$event->id, $player['id']]) }}" method="POST" data-ajax="true" class="mb-1">
-                                    @csrf
-                                    <select name="payment_status" class="text-xs rounded-lg border-gray-200 py-1.5 {{ $player['payment_status'] === 'paid' ? 'bg-emerald-50 text-emerald-700' : ($player['payment_status'] === 'failed' ? 'bg-rose-50 text-rose-700' : 'bg-amber-50 text-amber-700') }}">
-                                        <option value="pending" {{ $player['payment_status'] === 'pending' ? 'selected' : '' }}>Pending</option>
-                                        <option value="paid" {{ $player['payment_status'] === 'paid' ? 'selected' : '' }}>Paid</option>
-                                        <option value="failed" {{ $player['payment_status'] === 'failed' ? 'selected' : '' }}>Failed</option>
-                                    </select>
-                                </form>
+                                <span class="inline-block text-xs font-semibold rounded-lg px-2.5 py-1.5 mb-1 {{ $player['payment_status'] === 'paid' ? 'bg-emerald-50 text-emerald-700' : ($player['payment_status'] === 'failed' ? 'bg-rose-50 text-rose-700' : 'bg-amber-50 text-amber-700') }}">
+                                    {{ ucfirst($player['payment_status']) }}
+                                </span>
                                 @if($player['payment_reference'])
                                     <div class="text-[11px] text-gray-400">Ref: {{ $player['payment_reference'] }}</div>
                                 @endif
@@ -239,7 +230,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="6" class="px-6 py-10 text-center text-sm text-gray-400">Belum ada pemain yang bergabung.</td>
+                            <td colspan="5" class="px-6 py-10 text-center text-sm text-gray-400">Belum ada pemain yang bergabung.</td>
                         </tr>
                     @endforelse
                 </tbody>
@@ -253,15 +244,10 @@
 <script>
 (function () {
     const liveUrl = @json(route('admin.events.live', $event->id));
-    const statusUrlTemplate = @json(route('admin.events.updateStatus', [$event->id, '__PLAYER__']));
-    const attendanceUrlTemplate = @json(route('admin.events.updateAttendance', [$event->id, '__PLAYER__']));
-    const paymentUrlTemplate = @json(route('admin.events.updatePayment', [$event->id, '__PLAYER__']));
-    const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
     const playersBody = document.getElementById('players-table-body');
     const feedback = document.getElementById('ajax-feedback');
 
     function rupiah(v) { return new Intl.NumberFormat('id-ID').format(Number(v||0)); }
-    function ep(t,id) { return t.replace('__PLAYER__',id); }
     function esc(v) { return String(v||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;'); }
     function pc(s) { return s==='paid'?'bg-emerald-50 text-emerald-700':s==='failed'?'bg-rose-50 text-rose-700':'bg-amber-50 text-amber-700'; }
     function jc(s) { return s==='joined'?'bg-emerald-50 text-emerald-700':'bg-rose-50 text-rose-700'; }
@@ -279,16 +265,17 @@
     }
 
     function renderPlayers(players) {
-        if(!players||!players.length){playersBody.innerHTML='<tr><td colspan="6" class="px-6 py-10 text-center text-sm text-gray-400">Belum ada peserta yang bergabung.</td></tr>';return;}
+        if(!players||!players.length){playersBody.innerHTML='<tr><td colspan="5" class="px-6 py-10 text-center text-sm text-gray-400">Belum ada peserta yang bergabung.</td></tr>';return;}
         playersBody.innerHTML=players.map((p,i)=>{
             const ref=p.payment_reference?'<div class="text-[11px] text-gray-400">Ref: '+esc(p.payment_reference)+'</div>':'';
+            const statusLabel=p.status_join==='joined'?'Joined':'Batal';
+            const paymentLabel=p.payment_status.charAt(0).toUpperCase()+p.payment_status.slice(1);
             return '<tr class="hover:bg-gray-50/50 transition-colors">'
             +'<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-400">'+(i+1)+'</td>'
             +'<td class="px-6 py-4 whitespace-nowrap"><div class="flex items-center gap-3"><div class="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 text-xs font-bold">'+esc(p.nama).charAt(0).toUpperCase()+'</div><div><p class="text-sm font-semibold text-gray-800">'+esc(p.nama)+'</p><p class="text-xs text-gray-400">'+esc(p.kontak)+'</p></div></div></td>'
             +'<td class="px-6 py-4 whitespace-nowrap text-xs text-gray-400 text-center">'+esc(p.joined_at_human)+'</td>'
-            +'<td class="px-6 py-4 whitespace-nowrap text-center"><form action="'+ep(statusUrlTemplate,p.id)+'" method="POST" data-ajax="true"><input type="hidden" name="_token" value="'+csrfToken+'"><select name="status_join" class="text-xs rounded-lg border-gray-200 py-1.5 '+jc(p.status_join)+'"><option value="joined" '+(p.status_join==='joined'?'selected':'')+'>Joined</option><option value="batal" '+(p.status_join==='batal'?'selected':'')+'>Batal</option></select></form></td>'
-            +'<td class="px-6 py-4 whitespace-nowrap text-center"><form action="'+ep(attendanceUrlTemplate,p.id)+'" method="POST" data-ajax="true"><input type="hidden" name="_token" value="'+csrfToken+'"><input type="checkbox" name="hadir" value="1" class="h-5 w-5 text-blue-600 rounded border-gray-300 cursor-pointer" '+(p.hadir?'checked':'')+'></form></td>'
-            +'<td class="px-6 py-4 whitespace-nowrap text-center text-xs text-gray-600"><div class="mb-2">'+esc(p.payment_method_label)+' <span class="font-semibold">- Rp '+rupiah(p.payment_amount)+'</span></div><form action="'+ep(paymentUrlTemplate,p.id)+'" method="POST" data-ajax="true" class="mb-1"><input type="hidden" name="_token" value="'+csrfToken+'"><select name="payment_status" class="text-xs rounded-lg border-gray-200 py-1.5 '+pc(p.payment_status)+'"><option value="pending" '+(p.payment_status==='pending'?'selected':'')+'>Pending</option><option value="paid" '+(p.payment_status==='paid'?'selected':'')+'>Paid</option><option value="failed" '+(p.payment_status==='failed'?'selected':'')+'>Failed</option></select></form>'+ref+'</td></tr>';
+            +'<td class="px-6 py-4 whitespace-nowrap text-center"><span class="inline-block text-xs font-semibold rounded-lg px-2.5 py-1.5 '+jc(p.status_join)+'">'+statusLabel+'</span></td>'
+            +'<td class="px-6 py-4 whitespace-nowrap text-center text-xs text-gray-600"><div class="mb-2">'+esc(p.payment_method_label)+' <span class="font-semibold">- Rp '+rupiah(p.payment_amount)+'</span></div><span class="inline-block text-xs font-semibold rounded-lg px-2.5 py-1.5 mb-1 '+pc(p.payment_status)+'">'+paymentLabel+'</span>'+ref+'</td></tr>';
         }).join('');
     }
 
@@ -306,13 +293,6 @@
         try{const r=await fetch(liveUrl,{headers:{'Accept':'application/json','X-Requested-With':'XMLHttpRequest'}});if(!r.ok)throw new Error('Gagal');applyLivePayload(await r.json());}
         catch(e){if(!s)showFeedback('Sinkron realtime gagal.','error');}
     }
-
-    async function submitAjaxForm(form) {
-        try{const r=await fetch(form.action,{method:'POST',headers:{'Accept':'application/json','X-CSRF-TOKEN':csrfToken,'X-Requested-With':'XMLHttpRequest'},body:new FormData(form)});const p=await r.json();if(!r.ok)throw new Error(p.message||'Update gagal.');if(p.live)applyLivePayload(p.live);else fetchLive(true);showFeedback(p.message||'Data berhasil diupdate.','success');}
-        catch(e){showFeedback(e.message||'Terjadi kesalahan.','error');}
-    }
-
-    playersBody.addEventListener('change',function(e){const f=e.target.closest('form[data-ajax="true"]');if(f)submitAjaxForm(f);});
 
     window.copyLink=function(){
         const i=document.getElementById('share-link');

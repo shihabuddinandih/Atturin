@@ -188,68 +188,31 @@
                     <span class="px-3 py-1 rounded-full text-xs font-medium border border-gray-200 text-gray-600">{{ $event->slot_max }} Slot</span>
                 </div>
 
-                {{-- Location + Info Grid --}}
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div class="pro-card p-5">
-                        <div class="flex items-center gap-2 mb-3">
-                            <svg class="w-4 h-4 text-brand-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/></svg>
-                            <h4 class="text-sm font-semibold text-gray-900">Lokasi</h4>
-                        </div>
-                        <p class="text-sm font-semibold text-gray-800">{{ $event->tempat }}</p>
-                        <div class="mt-3 h-28 rounded-xl bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center">
-                            <svg class="w-8 h-8 text-blue-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/></svg>
-                        </div>
-                    </div>
+                {{-- Biaya per slot (plain text, no card) --}}
+                <div class="flex items-center justify-between flex-wrap gap-1 px-1 text-sm">
+                    <span class="text-gray-500">Biaya per slot</span>
+                    @if($isCustomEvent)
+                        <span class="font-bold text-brand-500">Mulai dari Rp {{ number_format($displayPrice, 0, ',', '.') }}</span>
+                    @elseif($event->skema_iuran === 'loyalitas')
+                        @php
+                            $baseEst = ($event->slot_max > 0) ? ($event->biaya_total_event / $event->slot_max) : 0;
+                            if ($event->metode_pembayaran === 'online_banking') {
+                                $minBase = $baseEst * 0.70;
+                                $maxBase = $baseEst;
+                                $minEst = round($minBase + $computeAdminFee($minBase, 'online_banking'), -2);
+                                $maxEst = round($maxBase + $computeAdminFee($maxBase, 'online_banking'), -2);
+                            } else {
+                                $minEst = round($baseEst * 0.70, -2);
+                                $maxEst = round($baseEst, -2);
+                            }
+                        @endphp
+                        <span class="font-bold text-brand-500">Rp {{ number_format($minEst, 0, ',', '.') }} - Rp {{ number_format($maxEst, 0, ',', '.') }}</span>
+                    @else
+                        <span class="font-bold text-brand-500">Rp {{ number_format($displayPrice, 0, ',', '.') }}</span>
+                    @endif
+                </div>
 
-                    <div class="pro-card p-5">
-                        <div class="flex items-center gap-2 mb-3">
-                            <svg class="w-4 h-4 text-brand-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                            <h4 class="text-sm font-semibold text-gray-900">Informasi</h4>
-                        </div>
-                        <div class="space-y-3 text-sm">
-                            <div class="flex justify-between flex-wrap gap-1">
-                                <span class="text-gray-500">Biaya per slot</span>
-                                @if($isCustomEvent)
-                                    <div class="text-right">
-                                        <span class="font-bold text-brand-500 block">Mulai dari Rp {{ number_format($displayPrice, 0, ',', '.') }}</span>
-                                        <span class="text-[9px] text-amber-500 font-medium block mt-0.5">⚡ Harga tergantung role yang dipilih, {{ $adminNote }}</span>
-                                    </div>
-                                @elseif($event->skema_iuran === 'loyalitas')
-                                    @php
-                                        $baseEst = ($event->slot_max > 0) ? ($event->biaya_total_event / $event->slot_max) : 0;
-                                        if ($event->metode_pembayaran === 'online_banking') {
-                                            $minBase = $baseEst * 0.70;
-                                            $maxBase = $baseEst;
-                                            $minEst = round($minBase + $computeAdminFee($minBase, 'online_banking'), -2);
-                                            $maxEst = round($maxBase + $computeAdminFee($maxBase, 'online_banking'), -2);
-                                        } else {
-                                            $minEst = round($baseEst * 0.70, -2);
-                                            $maxEst = round($baseEst, -2);
-                                        }
-                                    @endphp
-                                    <div class="text-right">
-                                        <span class="font-bold text-brand-500 block">Rp {{ number_format($minEst, 0, ',', '.') }} - Rp {{ number_format($maxEst, 0, ',', '.') }}</span>
-                                        <span class="text-[9px] text-amber-500 font-medium block mt-0.5">⚡ Berdasarkan keaktifan Anda{{ $event->metode_pembayaran === 'online_banking' ? ', sudah termasuk biaya admin dan sistem' : '' }}</span>
-                                    </div>
-                                @else
-                                    <span class="font-bold text-brand-500">Rp {{ number_format($displayPrice, 0, ',', '.') }}</span>
-                                    @if($adminNote)
-                                        <span class="text-[9px] text-amber-500 font-medium block mt-0.5">⚡ {{ $adminNote }}</span>
-                                    @endif
-                                @endif
-                            </div>
-                            <div class="flex justify-between">
-                                <span class="text-gray-500">Pembayaran</span>
-                                <span class="font-semibold text-gray-800">{{ $paymentLabel }}</span>
-                            </div>
-                            <div class="flex justify-between">
-                                <span class="text-gray-500">Kapasitas</span>
-                                <span class="font-semibold text-gray-800">{{ $event->slot_max }} pemain</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>{{-- end grid Lokasi + Informasi --}}
-
+                {{-- Card Fasilitas --}}
                 @if(!empty($event->facilities) && is_array($event->facilities))
                     <div class="pro-card p-5">
                         <div class="flex items-center gap-2 mb-3">
@@ -258,55 +221,34 @@
                         </div>
                         <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 text-sm text-gray-700">
                             @foreach($event->facilities as $facility)
-                                <div class="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5">{{ $facility }}</div>
-                            @endforeach
-                        </div>
-                    </div>
-                @endif
-
-                @if($isCustomEvent)
-                    <div class="pro-card p-6">
-                        <div class="flex items-center justify-between mb-4">
-                            <div>
-                                <h3 class="text-base font-semibold text-gray-900">Role Tersedia</h3>
-                                <p class="text-sm text-gray-500">Pilih role yang sesuai saat mendaftar.</p>
-                            </div>
-                            <span class="px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700">Custom Pricing</span>
-                        </div>
-                        <div class="space-y-3">
-                            @foreach($customRoles as $role)
                                 @php
-                                    $rolePrice = (float) ($role['price'] ?? 0);
-                                    $roleAdminFee = $role['admin_fee'] ?? $computeAdminFee($rolePrice, $event->metode_pembayaran);
-                                    $roleDisplayPrice = $role['display_price'] ?? ($rolePrice + $roleAdminFee);
+                                    $facilityKey = is_array($facility) ? ($facility['key'] ?? null) : null;
+                                    $facilityLabel = $facilityKey ? \App\Support\FacilityCatalog::label($facilityKey) : (is_string($facility) ? $facility : '');
+                                    $facilityNote = is_array($facility) ? ($facility['note'] ?? null) : null;
+                                    $facilityIcon = $facilityKey ? \App\Support\FacilityCatalog::icon($facilityKey) : null;
                                 @endphp
-                                <div class="rounded-2xl border border-gray-200 bg-gray-50 p-4">
-                                    <div class="flex items-center justify-between gap-3">
-                                        <div>
-                                            <p class="text-sm font-semibold text-gray-900">{{ $role['name'] }}</p>
-                                            <p class="text-xs text-gray-500">
-                                                Slot maksimal {{ $role['slots'] }} · Terisi {{ $role['joined'] ?? 0 }}
-                                            </p>
-                                        </div>
-                                        <div class="text-right">
-                                            <p class="text-sm font-semibold text-brand-600">Rp {{ number_format($roleDisplayPrice, 0, ',', '.') }}</p>
-                                            <p class="text-[11px] text-slate-500">
-                                                @if($role['is_full'])
-                                                    <span class="text-rose-500">Penuh</span>
-                                                @else
-                                                    Sisa {{ $role['slots_left'] }} slot
-                                                @endif
-                                                @if($event->metode_pembayaran === 'online_banking')
-                                                    <br><span class="text-[10px] text-amber-500">sudah termasuk biaya admin dan sistem</span>
-                                                @endif
-                                            </p>
-                                        </div>
-                                    </div>
+                                <div class="flex items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5">
+                                    <span class="w-7 h-7 rounded-lg bg-brand-50 flex items-center justify-center text-brand-500 flex-shrink-0">
+                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">{!! $facilityIcon ?? \App\Support\FacilityCatalog::icon('') !!}</svg>
+                                    </span>
+                                    <span>{{ $facilityLabel }}@if($facilityNote) <span class="text-gray-500">({{ $facilityNote }})</span>@endif</span>
                                 </div>
                             @endforeach
                         </div>
                     </div>
                 @endif
+
+                {{-- Card Lokasi --}}
+                <div class="pro-card p-5">
+                    <div class="flex items-center gap-2 mb-3">
+                        <svg class="w-4 h-4 text-brand-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/></svg>
+                        <h4 class="text-sm font-semibold text-gray-900">Lokasi</h4>
+                    </div>
+                    <p class="text-sm font-semibold text-gray-800">{{ $event->tempat }}</p>
+                    <div class="mt-3 h-28 rounded-xl bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center">
+                        <svg class="w-8 h-8 text-blue-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/></svg>
+                    </div>
+                </div>
 
                 {{-- Registration Form (mobile only) --}}
                 @if(empty($pendingJoinPlayer) && ($isFull === false || $event->enable_waiting_list))

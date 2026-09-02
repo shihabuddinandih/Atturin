@@ -7,6 +7,7 @@ use App\Enums\PaymentStatus;
 use App\Jobs\SendWaitlistOfferJob;
 use App\Models\Event;
 use App\Services\EventService;
+use App\Support\FacilityCatalog;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 
@@ -50,7 +51,8 @@ class AdminEventController extends Controller
             'roles.*.slots' => 'required_if:skema_iuran,custom|integer|min:1',
             'roles.*.price' => 'required_if:skema_iuran,custom|numeric|min:0',
             'facilities' => 'nullable|array',
-            'facilities.*' => 'nullable|string|max:255',
+            'facilities.*.key' => 'required_with:facilities|string|in:' . implode(',', array_keys(FacilityCatalog::options())),
+            'facilities.*.note' => 'nullable|string|max:255',
             'show_joined_players_public' => 'nullable|boolean',
             'show_joined_player_contacts_public' => 'nullable|boolean',
             'enable_waiting_list' => 'nullable|boolean',
@@ -86,9 +88,12 @@ class AdminEventController extends Controller
             unset($validated['roles']);
         }
 
-        $validated['facilities'] = array_values(array_filter($validated['facilities'] ?? [], function ($facility) {
-            return trim((string) $facility) !== '';
-        }));
+        $validated['facilities'] = array_values(array_map(function ($facility) {
+            return [
+                'key' => $facility['key'],
+                'note' => trim((string) ($facility['note'] ?? '')) !== '' ? trim($facility['note']) : null,
+            ];
+        }, $validated['facilities'] ?? []));
 
         if (empty($validated['facilities'])) {
             $validated['facilities'] = null;

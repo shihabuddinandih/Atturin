@@ -2,7 +2,7 @@
 <html lang="id">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>{{ config('app.name', 'Atturin') }} — Admin</title>
     <link rel="icon" type="image/png" href="{{ asset('images/Logo/Logo (Lettermark)/Primary Dark.png') }}">
@@ -189,6 +189,12 @@
                         @csrf
                         <button type="submit" class="px-4 py-2 rounded-xl border border-gray-200 text-sm font-semibold text-gray-600 hover:border-rose-200 hover:text-rose-600 transition-colors">
                             Logout
+                        </button>
+                    </form>
+                    <form method="POST" action="{{ route('logout') }}" class="sm:hidden">
+                        @csrf
+                        <button type="submit" class="p-2 rounded-xl text-gray-500 hover:bg-gray-100 hover:text-rose-600 transition-colors" aria-label="Logout">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
                         </button>
                     </form>
 
