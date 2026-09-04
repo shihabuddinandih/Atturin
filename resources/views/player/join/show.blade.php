@@ -164,19 +164,19 @@
                         <span class="absolute top-4 left-4 z-10 px-3 py-1 rounded-lg text-xs font-bold {{ $isFull ? 'bg-rose-500 text-white' : 'bg-lime-400 text-brand-900' }}">
                             {{ $isFull ? '✕ Full' : 'Terbuka' }}
                         </span>
+                    </div>
+                </div>
 
-                        {{-- Bottom-left: Date & Time prominent pill --}}
-                        <div class="absolute bottom-0 left-0 right-0 px-4 pb-4 flex items-end justify-between z-10">
-                            <div class="flex items-center gap-3 bg-white/15 backdrop-blur-sm border border-white/25 rounded-2xl px-4 py-2.5">
-                                <div class="flex items-center justify-center w-9 h-9 rounded-xl bg-white/20">
-                                    <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-                                </div>
-                                <div>
-                                    <p class="text-white/70 text-[10px] uppercase tracking-wider font-semibold leading-none mb-0.5">Jadwal Event</p>
-                                    <p class="text-white font-bold text-sm leading-tight">{{ \Carbon\Carbon::parse($event->tanggal)->translatedFormat('l, d M Y') }}</p>
-                                    <p class="text-lime-300 font-semibold text-xs mt-0.5">🕐 {{ $event->waktu }} WIB</p>
-                                </div>
-                            </div>
+                {{-- Card Jadwal Event (below banner) --}}
+                <div class="pro-card p-5">
+                    <div class="flex items-center gap-3">
+                        <div class="flex items-center justify-center w-11 h-11 rounded-xl bg-brand-50 flex-shrink-0">
+                            <svg class="w-5 h-5 text-brand-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                        </div>
+                        <div>
+                            <p class="text-gray-400 text-[10px] uppercase tracking-wider font-semibold leading-none mb-1">Jadwal Event</p>
+                            <p class="text-gray-900 font-bold text-sm leading-tight">{{ \Carbon\Carbon::parse($event->tanggal)->translatedFormat('l, d M Y') }}</p>
+                            <p class="text-brand-500 font-semibold text-xs mt-0.5">🕐 {{ $event->waktu }} WIB</p>
                         </div>
                     </div>
                 </div>
