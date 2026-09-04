@@ -6,6 +6,7 @@ use App\Enums\JoinStatus;
 use App\Enums\PaymentStatus;
 use App\Jobs\SendWaitlistOfferJob;
 use App\Models\Event;
+use App\Models\PlayerContactRequest;
 use App\Services\EventService;
 use App\Support\FacilityCatalog;
 use Illuminate\Http\Request;
@@ -267,6 +268,37 @@ class AdminEventController extends Controller
         }
 
         return back()->with('success', 'Status pembayaran berhasil diupdate.');
+    }
+
+    public function requestContact(Request $request, Event $event, $playerId)
+    {
+        $this->authorize('update', $event);
+
+        if (!$event->players()->where('players.id', $playerId)->exists()) {
+            if ($request->expectsJson()) {
+                return response()->json(['message' => 'Pemain tidak ditemukan pada event ini.'], 404);
+            }
+
+            return back()->with('error', 'Pemain tidak ditemukan pada event ini.');
+        }
+
+        $contactRequest = PlayerContactRequest::firstOrCreate(
+            ['event_id' => $event->id, 'player_id' => $playerId, 'status' => 'pending'],
+            ['requested_by' => auth()->id()]
+        );
+
+        $message = $contactRequest->wasRecentlyCreated
+            ? 'Permintaan chat terkirim ke Super Admin.'
+            : 'Permintaan chat untuk peserta ini masih menunggu diproses Super Admin.';
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'message' => $message,
+                'live' => $this->eventService->buildLivePayload($event),
+            ]);
+        }
+
+        return back()->with('success', $message);
     }
 
     private function promoteNextWaitingPlayer(Event $event): void

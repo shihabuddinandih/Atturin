@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>Konfirmasi Pendaftaran — {{ config('app.name', 'Atturin') }}</title>
+    <title>Permintaan Kontak Peserta — {{ config('app.name', 'Atturin') }}</title>
     <link rel="icon" type="image/png" href="{{ asset('images/Logo/Logo (Lettermark)/Primary Dark.png') }}">
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -105,8 +105,8 @@
     <div class="main-content min-h-screen p-8 lg:p-10 flex flex-col gap-6">
         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
-                <h2 class="text-2xl font-bold text-slate-900">Konfirmasi Pendaftaran</h2>
-                <p class="text-sm text-slate-500 mt-1">Kirim pesan konfirmasi berisi link status pendaftaran &amp; pembayaran ke peserta yang baru saja mendaftar. Peserta akan menerimanya seolah otomatis.</p>
+                <h2 class="text-2xl font-bold text-slate-900">Permintaan Kontak Peserta</h2>
+                <p class="text-sm text-slate-500 mt-1">Admin komunitas meminta peserta ini dihubungi. Buka WhatsApp dan kirimkan pesan agar terlihat seperti otomatis dari sistem.</p>
             </div>
         </div>
 
@@ -122,54 +122,44 @@
             </div>
         @endif
 
-        @forelse($events as $event)
+        @forelse($requests as $eventId => $eventRequests)
+            @php($event = $eventRequests->first()->event)
             <div class="pro-card overflow-hidden">
                 <div class="px-6 py-5 border-b border-slate-100 bg-slate-50/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div>
-                        <h3 class="text-lg font-bold text-slate-900">{{ $event->nama_event }}</h3>
+                        <h3 class="text-lg font-bold text-slate-900">{{ $event->nama_event ?? 'Event' }}</h3>
                         <p class="text-sm text-slate-500 mt-1">{{ $event->tanggal ? $event->tanggal->format('d M Y') : '-' }} • {{ $event->tempat ?: '-' }}</p>
                     </div>
                     <div class="text-sm font-semibold text-violet-700 bg-violet-50 rounded-full px-3 py-1">
-                        {{ $event->players->count() }} menunggu konfirmasi
+                        {{ $eventRequests->count() }} permintaan menunggu
                     </div>
                 </div>
 
                 <div class="divide-y divide-slate-100">
-                    @forelse($event->players as $player)
+                    @foreach($eventRequests as $contactRequest)
+                        @php($player = $contactRequest->player)
                         <div class="px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                             <div>
                                 <div class="flex items-center gap-2 flex-wrap">
                                     <p class="font-semibold text-slate-800">{{ $player->nama ?? 'Peserta' }}</p>
-                                    @if(!empty($player->pivot->role_name))
-                                        <span class="px-2.5 py-1 rounded-full text-[11px] font-semibold bg-slate-100 text-slate-600 border border-slate-200">
-                                            {{ $player->pivot->role_name }}
-                                        </span>
-                                    @endif
-                                    <span class="px-2.5 py-1 rounded-full text-[11px] font-semibold {{ $player->pivot->payment_status === 'paid' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-amber-50 text-amber-700 border border-amber-200' }}">
-                                        {{ ucfirst($player->pivot->payment_status) }}
+                                    <span class="px-2.5 py-1 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+                                        Belum diproses
                                     </span>
                                 </div>
-                                <p class="text-sm text-slate-500 mt-1">{{ $player->kontak ?: '-' }}</p>
-                                <p class="text-xs text-slate-400 mt-1">
-                                    Daftar: {{ $player->pivot->created_at ? $player->pivot->created_at->format('d M Y, H:i') : '-' }}
-                                    • Nominal: Rp {{ number_format($player->pivot->payment_amount ?? 0, 0, ',', '.') }}
-                                </p>
+                                <p class="text-sm text-slate-500 mt-1">{{ $player->kontak ?? '-' }}</p>
+                                <p class="text-xs text-slate-400 mt-1">Diminta {{ $contactRequest->created_at->diffForHumans() }}</p>
                             </div>
-                            <a href="{{ route('superadmin.registration-confirmations.send', ['event' => $event, 'player' => $player]) }}"
+                            <a href="{{ route('superadmin.player-contact-requests.send', $contactRequest) }}"
                                class="inline-flex items-center justify-center rounded-xl bg-green-600 hover:bg-green-700 text-white font-semibold px-4 py-2.5 text-sm shadow-sm">
-                                Kirim Konfirmasi via WhatsApp
+                                Chat via WhatsApp
                             </a>
                         </div>
-                    @empty
-                        <div class="px-6 py-8 text-center text-sm text-slate-500">
-                            Tidak ada pendaftaran baru untuk event ini.
-                        </div>
-                    @endforelse
+                    @endforeach
                 </div>
             </div>
         @empty
             <div class="pro-card px-6 py-10 text-center text-sm text-slate-500">
-                Belum ada pendaftaran baru yang perlu dikonfirmasi.
+                Belum ada permintaan kontak peserta dari admin.
             </div>
         @endforelse
     </div>

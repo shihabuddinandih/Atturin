@@ -9,6 +9,7 @@ use App\Http\Controllers\PlayerJoinController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\RegistrationController;
 use App\Http\Controllers\SuperAdminPaymentReminderController;
+use App\Http\Controllers\SuperAdminPlayerContactRequestController;
 use App\Http\Controllers\SuperAdminWaitlistReminderController;
 use App\Http\Controllers\SuperAdminWithdrawalController;
 use Illuminate\Support\Facades\Route;
@@ -45,6 +46,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::post('events/{event}/attendance/{player}', [AdminEventController::class, 'updateAttendance'])->name('events.updateAttendance');
         Route::post('events/{event}/status/{player}', [AdminEventController::class, 'updateStatus'])->name('events.updateStatus');
         Route::post('events/{event}/payment/{player}', [AdminEventController::class, 'updatePayment'])->name('events.updatePayment');
+        Route::post('events/{event}/contact/{player}', [AdminEventController::class, 'requestContact'])->name('events.requestContact');
 
         // Members (dedicated controller)
         Route::get('members', [AdminMemberController::class, 'index'])->name('members.index');
@@ -72,6 +74,9 @@ Route::middleware(['auth', 'superadmin'])->prefix('superadmin')->name('superadmi
 
     Route::get('registration-confirmations', [\App\Http\Controllers\SuperAdminRegistrationConfirmationController::class, 'index'])->name('registration-confirmations.index');
     Route::get('registration-confirmations/{event}/{player}/send', [\App\Http\Controllers\SuperAdminRegistrationConfirmationController::class, 'send'])->name('registration-confirmations.send');
+
+    Route::get('player-contact-requests', [SuperAdminPlayerContactRequestController::class, 'index'])->name('player-contact-requests.index');
+    Route::get('player-contact-requests/{contactRequest}/send', [SuperAdminPlayerContactRequestController::class, 'send'])->name('player-contact-requests.send');
 });
 
 Route::get('/join/{slug}', [PlayerJoinController::class, 'show'])->name('player.join.show');

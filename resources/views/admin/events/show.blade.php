@@ -165,7 +165,7 @@
         </div>
         <div class="pro-card p-5">
             <p class="text-[11px] uppercase tracking-wider text-gray-400 font-semibold">Belum Dibayar</p>
-            <p id="metric-pending" class="text-2xl font-bold text-amber-600 mt-1">{{ $livePayload['metrics']['pending_count'] }}</p>
+            <p id="metric-pending" class="text-2xl font-bold text-rose-600 mt-1">{{ $livePayload['metrics']['pending_count'] }}</p>
             <p class="text-xs text-gray-400">menunggu pembayaran</p>
         </div>
         <div class="pro-card p-5">
@@ -188,53 +188,128 @@
 
         <div id="ajax-feedback" class="hidden px-6 py-3 text-sm"></div>
 
-        <div class="overflow-x-auto">
+        @php
+            $playersPage = collect($livePayload['players'])->take(10);
+        @endphp
+
+        {{-- Desktop / tablet: table layout --}}
+        <div class="hidden sm:block overflow-x-auto">
             <table class="min-w-full">
                 <thead>
                     <tr class="border-b border-gray-100">
                         <th class="px-6 py-3 text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wider">No</th>
                         <th class="px-6 py-3 text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Peserta</th>
-                        <th class="px-6 py-3 text-center text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Waktu Join</th>
-                        <th class="px-6 py-3 text-center text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Status Join</th>
-                        <th class="px-6 py-3 text-center text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Pembayaran</th>
+                        <th class="px-6 py-3 text-center text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Posisi</th>
+                        <th class="px-6 py-3 text-center text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Status Bayar</th>
+                        <th class="px-6 py-3 text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Kontak</th>
+                        <th class="px-6 py-3 text-center text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Aksi</th>
                     </tr>
                 </thead>
                 <tbody id="players-table-body" class="divide-y divide-gray-50">
-                    @forelse($livePayload['players'] as $index => $player)
+                    @forelse($playersPage as $index => $player)
                         <tr class="hover:bg-gray-50/50 transition-colors">
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-400">{{ $index + 1 }}</td>
                             <td class="px-6 py-4 whitespace-nowrap">
                                 <div class="flex items-center gap-3">
-                                    <div class="w-8 h-8 rounded-full bg-brand-50 flex items-center justify-center text-brand-600 text-xs font-bold">{{ strtoupper(substr($player['nama'], 0, 1)) }}</div>
+                                    <div class="w-8 h-8 rounded-full bg-brand-50 flex items-center justify-center text-brand-600 text-xs font-bold flex-shrink-0">{{ strtoupper(substr($player['nama'], 0, 1)) }}</div>
                                     <div>
                                         <p class="text-sm font-semibold text-gray-800">{{ $player['nama'] }}</p>
-                                        <p class="text-xs text-gray-400">{{ $player['kontak'] }}</p>
+                                        <span class="inline-block mt-0.5 text-[10px] font-semibold rounded-full px-2 py-0.5 {{ $player['status_join'] === 'joined' ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700' }}">
+                                            {{ $player['status_join'] === 'joined' ? 'Joined' : 'Batal' }}
+                                        </span>
                                     </div>
                                 </div>
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-xs text-gray-400 text-center">{{ $player['joined_at_human'] }}</td>
                             <td class="px-6 py-4 whitespace-nowrap text-center">
-                                <span class="inline-block text-xs font-semibold rounded-lg px-2.5 py-1.5 {{ $player['status_join'] === 'joined' ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700' }}">
-                                    {{ $player['status_join'] === 'joined' ? 'Joined' : 'Batal' }}
-                                </span>
+                                @if(!empty($player['role_name']))
+                                    <span class="inline-block text-xs font-semibold rounded-full px-2.5 py-1 bg-indigo-50 text-indigo-700">{{ $player['role_name'] }}</span>
+                                @else
+                                    <span class="text-xs text-gray-300">—</span>
+                                @endif
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap text-center text-xs text-gray-600">
-                                <div class="mb-2">{{ $player['payment_method_label'] }} <span class="font-semibold">- Rp {{ number_format((float) $player['payment_amount'], 0, ',', '.') }}</span></div>
-                                <span class="inline-block text-xs font-semibold rounded-lg px-2.5 py-1.5 mb-1 {{ $player['payment_status'] === 'paid' ? 'bg-emerald-50 text-emerald-700' : ($player['payment_status'] === 'failed' ? 'bg-rose-50 text-rose-700' : 'bg-amber-50 text-amber-700') }}">
-                                    {{ ucfirst($player['payment_status']) }}
-                                </span>
-                                @if($player['payment_reference'])
-                                    <div class="text-[11px] text-gray-400">Ref: {{ $player['payment_reference'] }}</div>
-                                @endif
+                                @php
+                                    $paymentBadgeClass = $player['payment_status'] === 'paid' ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700';
+                                    $paymentLabel = $player['payment_status'] === 'paid' ? 'Lunas' : ($player['payment_status'] === 'failed' ? 'Gagal' : 'Belum Lunas');
+                                @endphp
+                                <span class="inline-block text-xs font-semibold rounded-lg px-2.5 py-1.5 mb-1 {{ $paymentBadgeClass }}">{{ $paymentLabel }}</span>
+                                <div>{{ $player['payment_method_label'] }} <span class="font-semibold">- Rp {{ number_format((float) $player['payment_amount'], 0, ',', '.') }}</span></div>
+                                <div class="text-[11px] text-gray-400 mt-0.5">
+                                    {{ $player['joined_at_human'] }}@if($player['payment_reference']) • Ref: {{ $player['payment_reference'] }}@endif
+                                </div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-xs text-gray-600">{{ $player['kontak'] }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-center">
+                                @php
+                                    $contactStatus = $player['contact_status'] ?? null;
+                                @endphp
+                                <button type="button"
+                                    class="contact-btn inline-flex items-center justify-center w-9 h-9 rounded-xl transition-colors {{ $contactStatus === 'pending' ? 'bg-amber-50 text-amber-500 cursor-not-allowed' : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100' }}"
+                                    data-player-id="{{ $player['id'] }}"
+                                    title="{{ $contactStatus === 'pending' ? 'Menunggu diproses Super Admin' : 'Minta Super Admin menghubungi peserta ini' }}"
+                                    {{ $contactStatus === 'pending' ? 'disabled' : '' }}>
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
+                                </button>
                             </td>
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="5" class="px-6 py-10 text-center text-sm text-gray-400">Belum ada pemain yang bergabung.</td>
+                            <td colspan="6" class="px-6 py-10 text-center text-sm text-gray-400">Belum ada pemain yang bergabung.</td>
                         </tr>
                     @endforelse
                 </tbody>
             </table>
+        </div>
+
+        {{-- Mobile: stacked card layout --}}
+        <div id="players-cards-body" class="sm:hidden divide-y divide-gray-100">
+            @forelse($playersPage as $player)
+                @php
+                    $paymentBadgeClass = $player['payment_status'] === 'paid' ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700';
+                    $paymentLabel = $player['payment_status'] === 'paid' ? 'Lunas' : ($player['payment_status'] === 'failed' ? 'Gagal' : 'Belum Lunas');
+                    $contactStatus = $player['contact_status'] ?? null;
+                @endphp
+                <div class="p-4">
+                    <div class="flex items-start justify-between gap-3">
+                        <div class="flex items-center gap-3 min-w-0">
+                            <div class="w-9 h-9 rounded-full bg-brand-50 flex items-center justify-center text-brand-600 text-xs font-bold flex-shrink-0">{{ strtoupper(substr($player['nama'], 0, 1)) }}</div>
+                            <div class="min-w-0">
+                                <p class="text-sm font-semibold text-gray-800 truncate">{{ $player['nama'] }}</p>
+                                <p class="text-xs text-gray-400 truncate">{{ $player['kontak'] }}</p>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-2 flex-shrink-0">
+                            @if(!empty($player['role_name']))
+                                <span class="inline-block text-xs font-semibold rounded-full px-2.5 py-1 bg-indigo-50 text-indigo-700">{{ $player['role_name'] }}</span>
+                            @endif
+                            <button type="button"
+                                class="contact-btn inline-flex items-center justify-center w-9 h-9 rounded-xl transition-colors {{ $contactStatus === 'pending' ? 'bg-amber-50 text-amber-500 cursor-not-allowed' : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100' }}"
+                                data-player-id="{{ $player['id'] }}"
+                                title="{{ $contactStatus === 'pending' ? 'Menunggu diproses Super Admin' : 'Minta Super Admin menghubungi peserta ini' }}"
+                                {{ $contactStatus === 'pending' ? 'disabled' : '' }}>
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-2 mt-2.5">
+                        <span class="inline-block text-[10px] font-semibold rounded-full px-2 py-0.5 {{ $player['status_join'] === 'joined' ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700' }}">
+                            {{ $player['status_join'] === 'joined' ? 'Joined' : 'Batal' }}
+                        </span>
+                        <span class="inline-block text-xs font-semibold rounded-lg px-2.5 py-1 {{ $paymentBadgeClass }}">{{ $paymentLabel }}</span>
+                    </div>
+                    <div class="text-xs text-gray-600 mt-1.5">{{ $player['payment_method_label'] }} <span class="font-semibold">- Rp {{ number_format((float) $player['payment_amount'], 0, ',', '.') }}</span></div>
+                    <div class="text-[11px] text-gray-400 mt-0.5">
+                        {{ $player['joined_at_human'] }}@if($player['payment_reference']) • Ref: {{ $player['payment_reference'] }}@endif
+                    </div>
+                </div>
+            @empty
+                <div class="px-4 py-10 text-center text-sm text-gray-400">Belum ada pemain yang bergabung.</div>
+            @endforelse
+        </div>
+
+        <div id="players-pagination" class="px-6 py-4 border-t border-gray-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <span id="pagination-info" class="text-xs text-gray-500"></span>
+            <div id="pagination-controls" class="flex items-center gap-1"></div>
         </div>
     </div>
 </div>
@@ -244,12 +319,22 @@
 <script>
 (function () {
     const liveUrl = @json(route('admin.events.live', $event->id));
+    const contactUrlTemplate = @json(route('admin.events.requestContact', [$event->id, '__PLAYER__']));
+    const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
     const playersBody = document.getElementById('players-table-body');
+    const cardsBody = document.getElementById('players-cards-body');
+    const paginationInfo = document.getElementById('pagination-info');
+    const paginationControls = document.getElementById('pagination-controls');
     const feedback = document.getElementById('ajax-feedback');
+    const PAGE_SIZE = 10;
+    let allPlayers = [];
+    let currentPage = 1;
 
     function rupiah(v) { return new Intl.NumberFormat('id-ID').format(Number(v||0)); }
+    function ep(t,id) { return t.replace('__PLAYER__',id); }
     function esc(v) { return String(v||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;'); }
-    function pc(s) { return s==='paid'?'bg-emerald-50 text-emerald-700':s==='failed'?'bg-rose-50 text-rose-700':'bg-amber-50 text-amber-700'; }
+    function pc(s) { return s==='paid'?'bg-emerald-50 text-emerald-700':'bg-rose-50 text-rose-700'; }
+    function pl(s) { return s==='paid'?'Lunas':(s==='failed'?'Gagal':'Belum Lunas'); }
     function jc(s) { return s==='joined'?'bg-emerald-50 text-emerald-700':'bg-rose-50 text-rose-700'; }
 
     function showFeedback(msg,type) {
@@ -264,19 +349,107 @@
         showFeedback.t=setTimeout(()=>feedback.classList.add('hidden'),2200);
     }
 
-    function renderPlayers(players) {
-        if(!players||!players.length){playersBody.innerHTML='<tr><td colspan="5" class="px-6 py-10 text-center text-sm text-gray-400">Belum ada peserta yang bergabung.</td></tr>';return;}
-        playersBody.innerHTML=players.map((p,i)=>{
-            const ref=p.payment_reference?'<div class="text-[11px] text-gray-400">Ref: '+esc(p.payment_reference)+'</div>':'';
-            const statusLabel=p.status_join==='joined'?'Joined':'Batal';
-            const paymentLabel=p.payment_status.charAt(0).toUpperCase()+p.payment_status.slice(1);
-            return '<tr class="hover:bg-gray-50/50 transition-colors">'
-            +'<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-400">'+(i+1)+'</td>'
-            +'<td class="px-6 py-4 whitespace-nowrap"><div class="flex items-center gap-3"><div class="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 text-xs font-bold">'+esc(p.nama).charAt(0).toUpperCase()+'</div><div><p class="text-sm font-semibold text-gray-800">'+esc(p.nama)+'</p><p class="text-xs text-gray-400">'+esc(p.kontak)+'</p></div></div></td>'
-            +'<td class="px-6 py-4 whitespace-nowrap text-xs text-gray-400 text-center">'+esc(p.joined_at_human)+'</td>'
-            +'<td class="px-6 py-4 whitespace-nowrap text-center"><span class="inline-block text-xs font-semibold rounded-lg px-2.5 py-1.5 '+jc(p.status_join)+'">'+statusLabel+'</span></td>'
-            +'<td class="px-6 py-4 whitespace-nowrap text-center text-xs text-gray-600"><div class="mb-2">'+esc(p.payment_method_label)+' <span class="font-semibold">- Rp '+rupiah(p.payment_amount)+'</span></div><span class="inline-block text-xs font-semibold rounded-lg px-2.5 py-1.5 mb-1 '+pc(p.payment_status)+'">'+paymentLabel+'</span>'+ref+'</td></tr>';
-        }).join('');
+    function contactButtonHtml(p) {
+        const pending = p.contact_status === 'pending';
+        const cls = pending ? 'bg-amber-50 text-amber-500 cursor-not-allowed' : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100';
+        const title = pending ? 'Menunggu diproses Super Admin' : 'Minta Super Admin menghubungi peserta ini';
+        return '<button type="button" class="contact-btn inline-flex items-center justify-center w-9 h-9 rounded-xl transition-colors '+cls+'" data-player-id="'+p.id+'" title="'+esc(title)+'"'+(pending?' disabled':'')+'>'
+            +'<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg></button>';
+    }
+
+    function rowHtml(p, no) {
+        const ref = p.payment_reference ? ' • Ref: '+esc(p.payment_reference) : '';
+        const statusLabel = p.status_join==='joined' ? 'Joined' : 'Batal';
+        const roleHtml = p.role_name ? '<span class="inline-block text-xs font-semibold rounded-full px-2.5 py-1 bg-indigo-50 text-indigo-700">'+esc(p.role_name)+'</span>' : '<span class="text-xs text-gray-300">—</span>';
+        return '<tr class="hover:bg-gray-50/50 transition-colors">'
+        +'<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-400">'+no+'</td>'
+        +'<td class="px-6 py-4 whitespace-nowrap"><div class="flex items-center gap-3"><div class="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 text-xs font-bold flex-shrink-0">'+esc(p.nama).charAt(0).toUpperCase()+'</div><div><p class="text-sm font-semibold text-gray-800">'+esc(p.nama)+'</p><span class="inline-block mt-0.5 text-[10px] font-semibold rounded-full px-2 py-0.5 '+jc(p.status_join)+'">'+statusLabel+'</span></div></div></td>'
+        +'<td class="px-6 py-4 whitespace-nowrap text-center">'+roleHtml+'</td>'
+        +'<td class="px-6 py-4 whitespace-nowrap text-center text-xs text-gray-600"><span class="inline-block text-xs font-semibold rounded-lg px-2.5 py-1.5 mb-1 '+pc(p.payment_status)+'">'+pl(p.payment_status)+'</span><div>'+esc(p.payment_method_label)+' <span class="font-semibold">- Rp '+rupiah(p.payment_amount)+'</span></div><div class="text-[11px] text-gray-400 mt-0.5">'+esc(p.joined_at_human)+ref+'</div></td>'
+        +'<td class="px-6 py-4 whitespace-nowrap text-xs text-gray-600">'+esc(p.kontak)+'</td>'
+        +'<td class="px-6 py-4 whitespace-nowrap text-center">'+contactButtonHtml(p)+'</td>'
+        +'</tr>';
+    }
+
+    function cardHtml(p) {
+        const ref = p.payment_reference ? ' • Ref: '+esc(p.payment_reference) : '';
+        const statusLabel = p.status_join==='joined' ? 'Joined' : 'Batal';
+        const roleHtml = p.role_name ? '<span class="inline-block text-xs font-semibold rounded-full px-2.5 py-1 bg-indigo-50 text-indigo-700">'+esc(p.role_name)+'</span>' : '';
+        return '<div class="p-4">'
+        +'<div class="flex items-start justify-between gap-3">'
+        +'<div class="flex items-center gap-3 min-w-0"><div class="w-9 h-9 rounded-full bg-brand-50 flex items-center justify-center text-brand-600 text-xs font-bold flex-shrink-0">'+esc(p.nama).charAt(0).toUpperCase()+'</div><div class="min-w-0"><p class="text-sm font-semibold text-gray-800 truncate">'+esc(p.nama)+'</p><p class="text-xs text-gray-400 truncate">'+esc(p.kontak)+'</p></div></div>'
+        +'<div class="flex items-center gap-2 flex-shrink-0">'+roleHtml+contactButtonHtml(p)+'</div>'
+        +'</div>'
+        +'<div class="flex flex-wrap items-center gap-2 mt-2.5">'
+        +'<span class="inline-block text-[10px] font-semibold rounded-full px-2 py-0.5 '+jc(p.status_join)+'">'+statusLabel+'</span>'
+        +'<span class="inline-block text-xs font-semibold rounded-lg px-2.5 py-1 '+pc(p.payment_status)+'">'+pl(p.payment_status)+'</span>'
+        +'</div>'
+        +'<div class="text-xs text-gray-600 mt-1.5">'+esc(p.payment_method_label)+' <span class="font-semibold">- Rp '+rupiah(p.payment_amount)+'</span></div>'
+        +'<div class="text-[11px] text-gray-400 mt-0.5">'+esc(p.joined_at_human)+ref+'</div>'
+        +'</div>';
+    }
+
+    function renderRows(players, offset) {
+        if(!players||!players.length){
+            playersBody.innerHTML='<tr><td colspan="6" class="px-6 py-10 text-center text-sm text-gray-400">Belum ada peserta yang bergabung.</td></tr>';
+            if (cardsBody) cardsBody.innerHTML='<div class="px-4 py-10 text-center text-sm text-gray-400">Belum ada peserta yang bergabung.</div>';
+            return;
+        }
+        playersBody.innerHTML = players.map((p,i)=>rowHtml(p, offset+i+1)).join('');
+        if (cardsBody) cardsBody.innerHTML = players.map((p)=>cardHtml(p)).join('');
+        [playersBody, cardsBody].forEach(function (container) {
+            if (!container) return;
+            container.querySelectorAll('.contact-btn').forEach(function (btn) {
+                btn.addEventListener('click', function () { requestContact(btn); });
+            });
+        });
+    }
+
+    function totalPages() { return Math.max(1, Math.ceil(allPlayers.length / PAGE_SIZE)); }
+
+    function renderPagination(tp) {
+        if (!paginationInfo || !paginationControls) return;
+        const total = allPlayers.length;
+        if (!total) { paginationInfo.textContent = 'Tidak ada peserta.'; paginationControls.innerHTML = ''; return; }
+        const start = (currentPage-1)*PAGE_SIZE + 1;
+        const end = Math.min(currentPage*PAGE_SIZE, total);
+        paginationInfo.textContent = 'Menampilkan '+start+'-'+end+' dari '+total+' peserta';
+
+        let html = '<button type="button" data-page="'+(currentPage-1)+'" '+(currentPage<=1?'disabled':'')+' class="px-3 py-1.5 rounded-lg border border-gray-200 text-xs font-semibold text-gray-500 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-gray-50">Prev</button>';
+        for (let i=1;i<=tp;i++) {
+            html += '<button type="button" data-page="'+i+'" class="px-3 py-1.5 rounded-lg text-xs font-semibold '+(i===currentPage?'bg-brand-500 text-white':'text-gray-500 border border-gray-200 hover:bg-gray-50')+'">'+i+'</button>';
+        }
+        html += '<button type="button" data-page="'+(currentPage+1)+'" '+(currentPage>=tp?'disabled':'')+' class="px-3 py-1.5 rounded-lg border border-gray-200 text-xs font-semibold text-gray-500 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-gray-50">Next</button>';
+        paginationControls.innerHTML = html;
+        paginationControls.querySelectorAll('button[data-page]').forEach(function (btn) {
+            btn.addEventListener('click', function () { renderPage(parseInt(btn.getAttribute('data-page'), 10)); });
+        });
+    }
+
+    function renderPage(page) {
+        const tp = totalPages();
+        currentPage = Math.min(Math.max(1, page), tp);
+        const start = (currentPage-1)*PAGE_SIZE;
+        renderRows(allPlayers.slice(start, start+PAGE_SIZE), start);
+        renderPagination(tp);
+    }
+
+    async function requestContact(btn) {
+        const playerId = btn.getAttribute('data-player-id');
+        btn.disabled = true;
+        try {
+            const r = await fetch(ep(contactUrlTemplate, playerId), {
+                method: 'POST',
+                headers: {'Accept':'application/json','X-CSRF-TOKEN':csrfToken,'X-Requested-With':'XMLHttpRequest'},
+            });
+            const p = await r.json();
+            if (!r.ok) throw new Error(p.message || 'Gagal mengirim permintaan.');
+            showFeedback(p.message || 'Permintaan terkirim.', 'success');
+            if (p.live) applyLivePayload(p.live); else fetchLive(true);
+        } catch (e) {
+            btn.disabled = false;
+            showFeedback(e.message || 'Terjadi kesalahan.', 'error');
+        }
     }
 
     function applyLivePayload(p) {
@@ -286,7 +459,8 @@
         document.getElementById('metric-pending').textContent=p.metrics.pending_count;
         document.getElementById('metric-collected').innerHTML='Rp '+rupiah(p.metrics.total_collected)+' <span class="text-gray-500 font-normal">/ '+rupiah({{ $event->biaya_total_event }})+'</span>';
         document.getElementById('live-updated-at').textContent=new Date().toLocaleTimeString('id-ID');
-        renderPlayers(p.players||[]);
+        allPlayers = p.players || [];
+        renderPage(currentPage);
     }
 
     async function fetchLive(s) {

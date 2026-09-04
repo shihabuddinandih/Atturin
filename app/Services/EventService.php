@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Enums\JoinStatus;
 use App\Enums\PaymentStatus;
 use App\Models\Event;
+use App\Models\PlayerContactRequest;
 use Illuminate\Support\Facades\DB;
 
 class EventService
@@ -108,13 +109,20 @@ class EventService
             $query->orderBy('event_player.created_at', 'asc');
         }]);
 
-        $players = $event->players->map(function ($player) {
+        $contactRequests = PlayerContactRequest::where('event_id', $event->id)
+            ->orderByDesc('id')
+            ->get()
+            ->unique('player_id')
+            ->keyBy('player_id');
+
+        $players = $event->players->map(function ($player) use ($contactRequests) {
             $joinedAt = $player->pivot->created_at;
 
             return [
                 'id' => $player->id,
                 'nama' => $player->nama,
                 'kontak' => $player->kontak,
+                'role_name' => $player->pivot->role_name,
                 'joined_at_human' => $joinedAt ? $joinedAt->diffForHumans() : '-',
                 'status_join' => $player->pivot->status_join,
                 'hadir' => (bool) $player->pivot->hadir,
@@ -123,6 +131,7 @@ class EventService
                 'payment_amount' => (float) $player->pivot->payment_amount,
                 'payment_status' => $player->pivot->payment_status,
                 'payment_reference' => $player->pivot->payment_reference,
+                'contact_status' => optional($contactRequests->get($player->id))->status,
             ];
         })->values();
 
