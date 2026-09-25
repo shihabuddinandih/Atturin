@@ -52,8 +52,17 @@
                                 </div>
                                 <div>
                                     <label class="block text-[10px] font-semibold text-gray-500 mb-1">Venue</label>
-                                    <input type="text" name="lokasi" value="{{ $match->lokasi ?? $tournament->lokasi }}" placeholder="{{ $tournament->lokasi }}"
-                                           class="w-full rounded-lg border border-gray-200 px-3 py-1.5 text-sm" {{ $match->status !== 'scheduled' ? 'disabled' : '' }}>
+                                    @if($tournament->venues->isNotEmpty())
+                                        <select name="tournament_venue_id" class="w-full rounded-lg border border-gray-200 px-3 py-1.5 text-sm" {{ $match->status !== 'scheduled' ? 'disabled' : '' }}>
+                                            <option value="">{{ $tournament->lokasi }}</option>
+                                            @foreach($tournament->venues as $venue)
+                                                <option value="{{ $venue->id }}" {{ (int) $match->tournament_venue_id === $venue->id ? 'selected' : '' }}>{{ $venue->nama }}</option>
+                                            @endforeach
+                                        </select>
+                                    @else
+                                        <input type="text" name="lokasi" value="{{ $match->lokasi ?? $tournament->lokasi }}" placeholder="{{ $tournament->lokasi }}"
+                                               class="w-full rounded-lg border border-gray-200 px-3 py-1.5 text-sm" {{ $match->status !== 'scheduled' ? 'disabled' : '' }}>
+                                    @endif
                                 </div>
                                 @if($match->status === 'scheduled')
                                     <button type="submit" class="px-4 py-2 rounded-xl bg-brand-500 text-white text-xs font-semibold hover:bg-brand-600">Simpan</button>

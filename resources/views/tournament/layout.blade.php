@@ -35,7 +35,9 @@
     <nav class="sticky top-0 z-40 bg-[#0A1628] border-b border-slate-800 text-white">
         <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex items-center justify-between h-14">
-                <span class="font-bold text-white truncate">{{ $tournament->nama_turnamen }}</span>
+                <a href="{{ route('tournament.show', $tournament) }}" class="flex items-center">
+                    <img src="{{ asset('images/Logo/Horizontal/Secondary.png') }}" class="h-6 object-contain" alt="{{ config('app.name', 'Atturin') }}">
+                </a>
                 <div class="flex items-center gap-6 text-sm font-medium text-slate-300">
                     <a href="{{ route('tournament.show', $tournament) }}"
                        class="pb-0.5 transition-colors {{ request()->routeIs('tournament.show') || request()->routeIs('tournament.match.show') ? 'text-lime-400 border-b-2 border-lime-400 font-semibold' : 'hover:text-white' }}">

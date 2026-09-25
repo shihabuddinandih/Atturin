@@ -73,6 +73,11 @@ class Tournament extends Model
         return $this->hasMany(TournamentMatch::class);
     }
 
+    public function venues()
+    {
+        return $this->hasMany(TournamentVenue::class)->orderBy('nama');
+    }
+
     // ─── Scopes ───────────────────────────────────────────────────
 
     public function scopeForAdmin($query, int $adminId)

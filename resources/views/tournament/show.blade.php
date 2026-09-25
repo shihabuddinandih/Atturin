@@ -2,9 +2,30 @@
 
 @section('content')
 <div class="space-y-6">
-    <div>
-        <h1 class="text-2xl font-bold text-gray-900">{{ $tournament->nama_turnamen }}</h1>
-        <p class="text-sm text-gray-500 mt-1">{{ $tournament->lokasi }} &middot; {{ $tournament->tanggal_mulai->translatedFormat('d M Y') }} &ndash; {{ $tournament->tanggal_selesai->translatedFormat('d M Y') }}</p>
+    <div class="relative overflow-hidden rounded-2xl {{ $tournament->banner_image ? '' : 'bg-gradient-to-br from-brand-900 via-brand-700 to-brand-500' }} text-white p-6 sm:p-8"
+         @if($tournament->banner_image) style="background-image: linear-gradient(to bottom right, rgba(10,22,40,0.85), rgba(0,82,255,0.75)), url('{{ asset('storage/' . $tournament->banner_image) }}'); background-size: cover; background-position: center;" @endif>
+        <span class="inline-flex px-2.5 py-1 rounded-full text-[10px] font-bold tracking-wide uppercase bg-white/15 text-white">
+            {{ \App\Enums\TournamentStatus::from($tournament->status)->label() }}
+        </span>
+        <h1 class="text-2xl sm:text-3xl font-bold mt-3">{{ $tournament->nama_turnamen }}</h1>
+        <div class="flex flex-wrap items-center gap-x-4 gap-y-1.5 mt-3 text-sm text-white/80">
+            <span class="inline-flex items-center gap-1.5">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M8 3v4M16 3v4M5 6h14a2 2 0 012 2v10a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2z"/></svg>
+                {{ $tournament->tanggal_mulai->translatedFormat('d M Y') }} &ndash; {{ $tournament->tanggal_selesai->translatedFormat('d M Y') }}
+            </span>
+            <span class="inline-flex items-center gap-1.5">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a2 2 0 01-2.828 0l-4.243-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                {{ $tournament->lokasi }}
+            </span>
+            <span class="inline-flex items-center gap-1.5">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6-1.13a4 4 0 10-4-4 4 4 0 004 4zm6 0a4 4 0 10-4-4"/></svg>
+                {{ $tournament->jumlah_tim }} Tim
+            </span>
+            <span class="inline-flex items-center gap-1.5">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/></svg>
+                {{ \App\Enums\TournamentFormat::from($tournament->format)->label() }}
+            </span>
+        </div>
     </div>
 
     <div id="livescore-root" data-poll-url="{{ route('tournament.livescore.poll', $tournament) }}">
@@ -35,7 +56,7 @@
                                 <p class="text-xs text-gray-400 mt-0.5">
                                     {{ $match->jadwal_tanggal->translatedFormat('d M Y') }}
                                     @if($match->jadwal_waktu) &middot; {{ \Carbon\Carbon::parse($match->jadwal_waktu)->format('H:i') }} WIB @endif
-                                    @if($match->lokasi) &middot; {{ $match->lokasi }} @endif
+                                    @if($match->venueName()) &middot; {{ $match->venueName() }} @endif
                                 </p>
                             </div>
 

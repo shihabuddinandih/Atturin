@@ -12,6 +12,7 @@ class TournamentMatchEvent extends Model
         'team_player_id',
         'tipe',
         'menit',
+        'babak',
         'catatan',
         'dicatat_oleh',
     ];

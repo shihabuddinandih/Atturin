@@ -31,6 +31,21 @@ class MatchLiveService
 
         $match->status = 'live';
         $match->started_at = now();
+        $match->babak = 1;
+        $match->babak_started_at = now();
+        $match->save();
+    }
+
+    public function advanceBabak(TournamentMatch $match): void
+    {
+        if ($match->status !== 'live') {
+            throw new RuntimeException('Pertandingan sedang tidak berlangsung.');
+        }
+
+        $match->babak += 1;
+        $match->babak_started_at = now();
+        $match->paused_at = null;
+        $match->total_paused_seconds = 0;
         $match->save();
     }
 
@@ -50,6 +65,7 @@ class MatchLiveService
             'team_player_id' => $data['team_player_id'] ?? null,
             'tipe' => $data['tipe'],
             'menit' => $data['menit'] ?? null,
+            'babak' => $match->babak,
             'catatan' => $data['catatan'] ?? null,
             'dicatat_oleh' => $recordedByUserId,
         ]);

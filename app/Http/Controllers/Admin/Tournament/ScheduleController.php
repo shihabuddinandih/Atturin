@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Tournament;
 use App\Models\TournamentMatch;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class ScheduleController extends Controller
 {
@@ -38,6 +39,11 @@ class ScheduleController extends Controller
             'jadwal_tanggal' => 'required|date',
             'jadwal_waktu' => 'required',
             'lokasi' => 'nullable|string|max:255',
+            'tournament_venue_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('tournament_venues', 'id')->where('tournament_id', $tournament->id),
+            ],
         ]);
 
         $tournamentMatch->update($validated);

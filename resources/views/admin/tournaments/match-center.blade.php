@@ -13,7 +13,7 @@
 
     {{-- Scoreboard --}}
     <div class="pro-card p-6" id="match-clock-root"
-         data-started-at="{{ $match->started_at?->toIso8601String() }}"
+         data-babak-started-at="{{ $match->babak_started_at?->toIso8601String() }}"
          data-paused-at="{{ $match->paused_at?->toIso8601String() }}"
          data-total-paused-seconds="{{ $match->total_paused_seconds }}"
          data-status="{{ $match->status }}">
@@ -38,15 +38,24 @@
                 @endif
             </div>
         </div>
-        <div class="flex items-center justify-center gap-2 mt-3">
-            <span class="inline-flex px-2.5 py-1 rounded-full text-[10px] font-bold bg-gray-100 text-gray-600 uppercase tracking-wider">
-                {{ \App\Enums\MatchStatus::from($match->status)->label() }}
-            </span>
-            @if($match->status === 'live')
-                <span id="match-clock" class="inline-flex px-2.5 py-1 rounded-full text-[10px] font-bold bg-brand-50 text-brand-600 tabular-nums">00:00</span>
-                @if($match->isPaused())
+        <div class="flex flex-col items-center gap-2 mt-3">
+            <div class="flex items-center justify-center gap-2">
+                <span class="inline-flex px-2.5 py-1 rounded-full text-[10px] font-bold bg-gray-100 text-gray-600 uppercase tracking-wider">
+                    {{ \App\Enums\MatchStatus::from($match->status)->label() }}
+                </span>
+                @if($match->status === 'live' && $match->isPaused())
                     <span class="inline-flex px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-100 text-amber-700 uppercase tracking-wider">Dijeda</span>
                 @endif
+            </div>
+            @if($match->status === 'live')
+                <div class="flex items-center justify-center gap-2">
+                    <span class="inline-flex px-2.5 py-1 rounded-full text-xs font-bold bg-brand-900 text-white uppercase tracking-wider">Babak {{ $match->babak }}</span>
+                    <form action="{{ route('admin.tournaments.matches.babak.advance', [$tournament, $match]) }}" method="POST" onsubmit="return confirm('Lanjut ke babak berikutnya? Jam akan mulai dari 0:00 lagi.')">
+                        @csrf
+                        <button type="submit" class="px-2.5 py-1 rounded-full text-[10px] font-bold border border-gray-200 text-gray-500 hover:border-brand-300 hover:text-brand-600 uppercase tracking-wider">Lanjut Babak</button>
+                    </form>
+                </div>
+                <span id="match-clock" class="inline-flex px-2.5 py-1 rounded-full text-[10px] font-bold bg-brand-50 text-brand-600 tabular-nums">00:00</span>
             @endif
         </div>
 
@@ -261,6 +270,7 @@
                 @foreach($match->events as $event)
                     <div class="px-5 py-3 flex items-center justify-between gap-3 text-sm">
                         <div>
+                            <span class="text-[10px] font-bold text-gray-400 uppercase tracking-wider mr-1">Babak {{ $event->babak ?? '-' }}</span>
                             <span class="font-semibold text-gray-800">{{ $event->menit ?? '-' }}</span>
                             <span class="text-gray-600">{{ \App\Enums\MatchEventType::from($event->tipe)->label() }}</span>
                             &mdash; {{ $event->player->nama ?? $event->team->nama_tim }}
@@ -279,41 +289,22 @@
         </div>
     @endif
 
-    {{-- Live stats --}}
+    {{-- Foul --}}
     @if($match->status !== 'scheduled')
         @php $stat = $match->stat; @endphp
         <div class="pro-card p-6">
-            <h3 class="text-sm font-semibold text-gray-900 mb-4">Statistik Pertandingan</h3>
-            <div class="space-y-3" id="stat-panel" data-url="{{ route('admin.tournaments.matches.stats.update', [$tournament, $match]) }}">
-                @foreach([
-                    'tembakan' => 'Tembakan',
-                    'tembakan_tepat' => 'Tembakan Tepat Sasaran',
-                    'pojok' => 'Tendangan Pojok',
-                    'pelanggaran' => 'Pelanggaran',
-                ] as $field => $label)
-                    <div class="flex items-center justify-between gap-4">
-                        <div class="flex items-center gap-2 w-24">
-                            <button type="button" class="stat-btn w-7 h-7 rounded-lg bg-gray-100 hover:bg-gray-200 font-bold" data-field="{{ $field }}_home" data-delta="-1" {{ $match->status !== 'live' ? 'disabled' : '' }}>&minus;</button>
-                            <span class="stat-value w-6 text-center font-semibold" data-field="{{ $field }}_home">{{ $stat?->{$field . '_home'} ?? 0 }}</span>
-                            <button type="button" class="stat-btn w-7 h-7 rounded-lg bg-gray-100 hover:bg-gray-200 font-bold" data-field="{{ $field }}_home" data-delta="1" {{ $match->status !== 'live' ? 'disabled' : '' }}>&plus;</button>
-                        </div>
-                        <span class="text-xs font-semibold text-gray-500 flex-1 text-center">{{ $label }}</span>
-                        <div class="flex items-center gap-2 w-24 justify-end">
-                            <button type="button" class="stat-btn w-7 h-7 rounded-lg bg-gray-100 hover:bg-gray-200 font-bold" data-field="{{ $field }}_away" data-delta="-1" {{ $match->status !== 'live' ? 'disabled' : '' }}>&minus;</button>
-                            <span class="stat-value w-6 text-center font-semibold" data-field="{{ $field }}_away">{{ $stat?->{$field . '_away'} ?? 0 }}</span>
-                            <button type="button" class="stat-btn w-7 h-7 rounded-lg bg-gray-100 hover:bg-gray-200 font-bold" data-field="{{ $field }}_away" data-delta="1" {{ $match->status !== 'live' ? 'disabled' : '' }}>&plus;</button>
-                        </div>
-                    </div>
-                @endforeach
-
-                <div class="flex items-center justify-between gap-4 pt-2 border-t border-gray-100">
-                    <div class="w-24">
-                        <input type="number" min="0" max="100" class="stat-input w-full rounded-lg border border-gray-200 px-2 py-1 text-sm text-center" data-field="possession_home" value="{{ $stat?->possession_home }}" placeholder="%" {{ $match->status !== 'live' ? 'disabled' : '' }}>
-                    </div>
-                    <span class="text-xs font-semibold text-gray-500 flex-1 text-center">Possession (%)</span>
-                    <div class="w-24">
-                        <input type="number" min="0" max="100" class="stat-input w-full rounded-lg border border-gray-200 px-2 py-1 text-sm text-center" data-field="possession_away" value="{{ $stat?->possession_away }}" placeholder="%" {{ $match->status !== 'live' ? 'disabled' : '' }}>
-                    </div>
+            <h3 class="text-sm font-semibold text-gray-900 mb-4 text-center">Foul</h3>
+            <div class="flex items-center justify-center gap-8" id="stat-panel" data-url="{{ route('admin.tournaments.matches.stats.update', [$tournament, $match]) }}">
+                <div class="flex items-center gap-3">
+                    <button type="button" class="stat-btn w-8 h-8 rounded-lg bg-gray-100 hover:bg-gray-200 font-bold" data-field="pelanggaran_home" data-delta="-1" {{ $match->status !== 'live' ? 'disabled' : '' }}>&minus;</button>
+                    <span class="stat-value w-10 text-center text-2xl font-bold text-gray-900" data-field="pelanggaran_home">{{ $stat?->pelanggaran_home ?? 0 }}</span>
+                    <button type="button" class="stat-btn w-8 h-8 rounded-lg bg-gray-100 hover:bg-gray-200 font-bold" data-field="pelanggaran_home" data-delta="1" {{ $match->status !== 'live' ? 'disabled' : '' }}>&plus;</button>
+                </div>
+                <span class="text-xs font-semibold text-gray-400 uppercase">vs</span>
+                <div class="flex items-center gap-3">
+                    <button type="button" class="stat-btn w-8 h-8 rounded-lg bg-gray-100 hover:bg-gray-200 font-bold" data-field="pelanggaran_away" data-delta="-1" {{ $match->status !== 'live' ? 'disabled' : '' }}>&minus;</button>
+                    <span class="stat-value w-10 text-center text-2xl font-bold text-gray-900" data-field="pelanggaran_away">{{ $stat?->pelanggaran_away ?? 0 }}</span>
+                    <button type="button" class="stat-btn w-8 h-8 rounded-lg bg-gray-100 hover:bg-gray-200 font-bold" data-field="pelanggaran_away" data-delta="1" {{ $match->status !== 'live' ? 'disabled' : '' }}>&plus;</button>
                 </div>
             </div>
         </div>
@@ -327,8 +318,8 @@
         // Live match clock: ticks every second from started_at, minus any
         // paused time, and auto-fills the "Menit" event field to match.
         const clockRoot = document.getElementById('match-clock-root');
-        if (clockRoot && clockRoot.dataset.startedAt) {
-            const startedAt = new Date(clockRoot.dataset.startedAt).getTime();
+        if (clockRoot && clockRoot.dataset.babakStartedAt) {
+            const startedAt = new Date(clockRoot.dataset.babakStartedAt).getTime();
             const totalPausedSeconds = parseInt(clockRoot.dataset.totalPausedSeconds || '0', 10);
             const pausedAt = clockRoot.dataset.pausedAt ? new Date(clockRoot.dataset.pausedAt).getTime() : null;
             const clockEl = document.getElementById('match-clock');

@@ -11,6 +11,7 @@ use App\Http\Controllers\Admin\Tournament\TeamJerseyController;
 use App\Http\Controllers\Admin\Tournament\TeamOfficialController;
 use App\Http\Controllers\Admin\Tournament\TeamPlayerController;
 use App\Http\Controllers\Admin\Tournament\TournamentController;
+use App\Http\Controllers\Admin\Tournament\TournamentVenueController;
 use App\Http\Controllers\TournamentBracketPublicController;
 use App\Http\Controllers\TournamentLivescoreController;
 use App\Http\Controllers\TournamentMatchPublicController;
@@ -44,6 +45,10 @@ Route::prefix('admin/turnamen')->name('admin.tournaments.')->middleware(['auth',
     Route::patch('{tournament}/tim/{team}/jersey/{jersey}', [TeamJerseyController::class, 'update'])->name('teams.jerseys.update');
     Route::delete('{tournament}/tim/{team}/jersey/{jersey}', [TeamJerseyController::class, 'destroy'])->name('teams.jerseys.destroy');
 
+    Route::post('{tournament}/lapangan', [TournamentVenueController::class, 'store'])->name('venues.store');
+    Route::patch('{tournament}/lapangan/{venue}', [TournamentVenueController::class, 'update'])->name('venues.update');
+    Route::delete('{tournament}/lapangan/{venue}', [TournamentVenueController::class, 'destroy'])->name('venues.destroy');
+
     Route::get('{tournament}/bracket', [BracketController::class, 'show'])->name('bracket.show');
     Route::post('{tournament}/bracket/slot/{slot}', [BracketController::class, 'assignSlot'])->name('bracket.assignSlot');
     Route::delete('{tournament}/bracket/slot/{slot}', [BracketController::class, 'clearSlot'])->name('bracket.clearSlot');
@@ -58,6 +63,7 @@ Route::prefix('admin/turnamen')->name('admin.tournaments.')->middleware(['auth',
     Route::post('{tournament}/pertandingan/{match}/pause', [MatchController::class, 'pause'])->name('matches.pause');
     Route::post('{tournament}/pertandingan/{match}/resume', [MatchController::class, 'resume'])->name('matches.resume');
     Route::patch('{tournament}/pertandingan/{match}/jersey', [MatchController::class, 'setJersey'])->name('matches.setJersey');
+    Route::post('{tournament}/pertandingan/{match}/babak/lanjut', [MatchController::class, 'advanceBabak'])->name('matches.babak.advance');
     Route::post('{tournament}/pertandingan/{match}/finish', [MatchController::class, 'finish'])->name('matches.finish');
 
     Route::post('{tournament}/pertandingan/{match}/events', [MatchEventController::class, 'store'])->name('matches.events.store');

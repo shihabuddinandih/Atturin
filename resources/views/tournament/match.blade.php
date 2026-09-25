@@ -8,7 +8,7 @@
     </div>
 
     <div id="match-root" data-poll-url="{{ route('tournament.match.poll', [$tournament, $match]) }}" data-status="{{ $payload['status'] }}" data-in-penalty="{{ ($payload['dalam_adu_penalti'] ?? false) ? 1 : 0 }}" data-kick-count="{{ count($payload['penalti_kicks'] ?? []) }}"
-         data-elapsed-seconds="{{ $payload['elapsed_seconds'] ?? 0 }}" data-is-paused="{{ ($payload['is_paused'] ?? false) ? 1 : 0 }}">
+         data-elapsed-seconds="{{ $payload['elapsed_seconds'] ?? 0 }}" data-is-paused="{{ ($payload['is_paused'] ?? false) ? 1 : 0 }}" data-babak="{{ $payload['babak'] ?? 1 }}">
         <div class="pro-card p-6">
             <div class="flex items-center justify-center gap-2 mb-1">
                 <span id="status-badge" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider {{ $payload['status'] === 'live' ? 'bg-rose-100 text-rose-700' : ($payload['status'] === 'finished' ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-600') }}">
@@ -17,10 +17,13 @@
                     @endif
                     {{ $payload['status_label'] }}
                 </span>
-                @if($payload['status'] === 'live')
-                    <span id="match-clock" class="inline-flex px-2.5 py-1 rounded-full text-[10px] font-bold bg-brand-50 text-brand-600 tabular-nums">00:00</span>
-                @endif
             </div>
+            @if($payload['status'] === 'live')
+                <div class="flex flex-col items-center gap-1 mb-1">
+                    <span class="inline-flex px-2.5 py-1 rounded-full text-xs font-bold bg-brand-900 text-white uppercase tracking-wider">Babak {{ $payload['babak'] ?? 1 }}</span>
+                    <span id="match-clock" class="inline-flex px-2.5 py-1 rounded-full text-[10px] font-bold bg-brand-50 text-brand-600 tabular-nums">00:00</span>
+                </div>
+            @endif
 
             <div class="flex items-center justify-between gap-4 mt-4">
                 <div class="flex-1 text-center">
@@ -67,21 +70,11 @@
              always has somewhere to write updates without a page reload. --}}
         @if($payload['status'] === 'live')
             <div class="pro-card p-6 mt-4">
-                <h3 class="text-sm font-semibold text-gray-900 mb-3">Statistik</h3>
-                <div id="stat-list" class="space-y-2 text-sm">
-                    @foreach([
-                        'possession' => 'Possession (%)',
-                        'tembakan' => 'Tembakan',
-                        'tembakan_tepat' => 'Tembakan Tepat Sasaran',
-                        'pojok' => 'Tendangan Pojok',
-                        'pelanggaran' => 'Pelanggaran',
-                    ] as $field => $label)
-                        <div class="flex items-center justify-between">
-                            <span class="stat-home w-10 text-right font-semibold" data-field="{{ $field }}_home">{{ $payload['stat'][$field . '_home'] ?? 0 }}</span>
-                            <span class="flex-1 text-center text-xs text-gray-400">{{ $label }}</span>
-                            <span class="stat-away w-10 font-semibold" data-field="{{ $field }}_away">{{ $payload['stat'][$field . '_away'] ?? 0 }}</span>
-                        </div>
-                    @endforeach
+                <h3 class="text-sm font-semibold text-gray-900 mb-3 text-center">Foul</h3>
+                <div id="stat-list" class="flex items-center justify-center gap-8">
+                    <span class="stat-home text-2xl font-bold text-gray-900" data-field="pelanggaran_home">{{ $payload['stat']['pelanggaran_home'] ?? 0 }}</span>
+                    <span class="text-xs font-semibold text-gray-400 uppercase">vs</span>
+                    <span class="stat-away text-2xl font-bold text-gray-900" data-field="pelanggaran_away">{{ $payload['stat']['pelanggaran_away'] ?? 0 }}</span>
                 </div>
             </div>
 
@@ -90,6 +83,7 @@
                 <div id="events-list" class="space-y-2 text-sm">
                     @forelse($payload['events'] as $event)
                         <div class="flex items-center gap-2">
+                            <span class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">B{{ $event['babak'] ?? '-' }}</span>
                             <span class="font-semibold text-gray-700 w-10">{{ $event['menit'] ?? '-' }}</span>
                             <span class="text-gray-600">{{ $event['tipe_label'] }}</span>
                             <span class="text-gray-400">&mdash; {{ $event['pemain'] ?? $event['team'] }} ({{ $event['team'] }})</span>
@@ -103,23 +97,11 @@
 
         @if($payload['status'] === 'finished' && $payload['stat'])
             <div class="pro-card p-6 mt-4">
-                <h3 class="text-sm font-semibold text-gray-900 mb-3">Statistik</h3>
-                <div class="space-y-2 text-sm">
-                    @foreach([
-                        'possession' => 'Possession (%)',
-                        'tembakan' => 'Tembakan',
-                        'tembakan_tepat' => 'Tembakan Tepat Sasaran',
-                        'pojok' => 'Tendangan Pojok',
-                        'pelanggaran' => 'Pelanggaran',
-                    ] as $field => $label)
-                        @if($payload['stat'][$field . '_home'] !== null)
-                            <div class="flex items-center justify-between">
-                                <span class="w-10 text-right font-semibold">{{ $payload['stat'][$field . '_home'] }}</span>
-                                <span class="flex-1 text-center text-xs text-gray-400">{{ $label }}</span>
-                                <span class="w-10 font-semibold">{{ $payload['stat'][$field . '_away'] }}</span>
-                            </div>
-                        @endif
-                    @endforeach
+                <h3 class="text-sm font-semibold text-gray-900 mb-3 text-center">Foul</h3>
+                <div class="flex items-center justify-center gap-8">
+                    <span class="text-2xl font-bold text-gray-900">{{ $payload['stat']['pelanggaran_home'] ?? 0 }}</span>
+                    <span class="text-xs font-semibold text-gray-400 uppercase">vs</span>
+                    <span class="text-2xl font-bold text-gray-900">{{ $payload['stat']['pelanggaran_away'] ?? 0 }}</span>
                 </div>
             </div>
         @endif
@@ -130,6 +112,7 @@
                 <div class="space-y-2 text-sm">
                     @foreach($payload['events'] as $event)
                         <div class="flex items-center gap-2">
+                            <span class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">B{{ $event['babak'] ?? '-' }}</span>
                             <span class="font-semibold text-gray-700 w-10">{{ $event['menit'] ?? '-' }}</span>
                             <span class="text-gray-600">{{ $event['tipe_label'] }}</span>
                             <span class="text-gray-400">&mdash; {{ $event['pemain'] ?? $event['team'] }} ({{ $event['team'] }})</span>
@@ -150,6 +133,7 @@
 
         let currentStatus = root.dataset.status;
         let currentInPenalty = root.dataset.inPenalty === '1';
+        let currentBabak = parseInt(root.dataset.babak || '1', 10);
         let lastKickCount = parseInt(root.dataset.kickCount || '0', 10);
         let elapsedSeconds = parseInt(root.dataset.elapsedSeconds || '0', 10);
         let isPaused = root.dataset.isPaused === '1';
@@ -209,6 +193,7 @@
             }
             eventsList.innerHTML = events.map((e) => `
                 <div class="flex items-center gap-2">
+                    <span class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">B${e.babak ?? '-'}</span>
                     <span class="font-semibold text-gray-700 w-10">${e.menit ?? '-'}</span>
                     <span class="text-gray-600">${e.tipe_label}</span>
                     <span class="text-gray-400">&mdash; ${e.pemain ?? e.team} (${e.team})</span>
@@ -223,11 +208,12 @@
                     const match = data.match;
                     if (!match) return;
 
-                    // Status changed (scheduled→live, live→finished), or the
-                    // match just entered/left a penalty shootout — the
+                    // Status changed (scheduled→live, live→finished), the
+                    // match just entered/left a penalty shootout, or the
+                    // babak advanced (clock resets to 0:00) — the
                     // server-rendered structure differs per state, so reload
                     // rather than trying to patch the DOM into a new shape.
-                    if (match.status !== currentStatus || match.dalam_adu_penalti !== currentInPenalty) {
+                    if (match.status !== currentStatus || match.dalam_adu_penalti !== currentInPenalty || match.babak !== currentBabak) {
                         window.location.reload();
                         return;
                     }

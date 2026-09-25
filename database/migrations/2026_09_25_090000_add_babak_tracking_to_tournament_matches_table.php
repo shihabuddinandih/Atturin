@@ -1,0 +1,29 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    /**
+     * Run the migrations.
+     */
+    public function up(): void
+    {
+        Schema::table('tournament_matches', function (Blueprint $table) {
+            $table->unsignedInteger('babak')->default(1)->after('total_paused_seconds');
+            $table->timestamp('babak_started_at')->nullable()->after('babak');
+        });
+    }
+
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
+    {
+        Schema::table('tournament_matches', function (Blueprint $table) {
+            $table->dropColumn(['babak', 'babak_started_at']);
+        });
+    }
+};

@@ -23,6 +23,7 @@ class TournamentMatch extends Model
         'jadwal_tanggal',
         'jadwal_waktu',
         'lokasi',
+        'tournament_venue_id',
         'status',
         'skor_home',
         'skor_away',
@@ -31,6 +32,8 @@ class TournamentMatch extends Model
         'started_at',
         'paused_at',
         'total_paused_seconds',
+        'babak',
+        'babak_started_at',
         'finished_at',
         'penalty_started_at',
     ];
@@ -39,6 +42,7 @@ class TournamentMatch extends Model
         'jadwal_tanggal' => 'date',
         'started_at' => 'datetime',
         'paused_at' => 'datetime',
+        'babak_started_at' => 'datetime',
         'finished_at' => 'datetime',
         'penalty_started_at' => 'datetime',
     ];
@@ -90,6 +94,11 @@ class TournamentMatch extends Model
         return $this->belongsTo(TeamJersey::class, 'away_jersey_id');
     }
 
+    public function venue()
+    {
+        return $this->belongsTo(TournamentVenue::class, 'tournament_venue_id');
+    }
+
     public function homeSourceMatch()
     {
         return $this->belongsTo(TournamentMatch::class, 'home_source_match_id');
@@ -138,13 +147,23 @@ class TournamentMatch extends Model
     }
 
     /**
-     * Seconds of actual play elapsed since kickoff, excluding any paused
-     * time. Frozen at the pause point while paused, and at finished_at
-     * once the match is over.
+     * Name of the venue for this match, falling back to the free-text
+     * `lokasi` on matches scheduled before venues existed.
+     */
+    public function venueName(): ?string
+    {
+        return $this->venue?->nama ?? $this->lokasi;
+    }
+
+    /**
+     * Seconds of actual play elapsed since the current babak started,
+     * excluding any paused time. Frozen at the pause point while paused,
+     * and at finished_at once the match is over. Resets to 0 whenever the
+     * babak advances (see MatchLiveService::advanceBabak).
      */
     public function elapsedSeconds(): int
     {
-        if (! $this->started_at) {
+        if (! $this->babak_started_at) {
             return 0;
         }
 
@@ -154,7 +173,7 @@ class TournamentMatch extends Model
             return 0;
         }
 
-        return max(0, $end->getTimestamp() - $this->started_at->getTimestamp() - $this->total_paused_seconds);
+        return max(0, $end->getTimestamp() - $this->babak_started_at->getTimestamp() - $this->total_paused_seconds);
     }
 
     public function elapsedMinutes(): int

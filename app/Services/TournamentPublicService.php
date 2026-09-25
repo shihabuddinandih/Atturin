@@ -11,19 +11,6 @@ use Illuminate\Support\Collection;
 class TournamentPublicService
 {
     /**
-     * All matches for a tournament, grouped by round name in round order —
-     * used for the public schedule/results listing.
-     */
-    public function matchesGroupedByRound(Tournament $tournament): Collection
-    {
-        return TournamentMatch::where('tournament_id', $tournament->id)
-            ->with(['round', 'teamHome', 'teamAway', 'pemenang'])
-            ->get()
-            ->sortBy(fn ($match) => [$match->round->urutan, $match->bracket_position])
-            ->groupBy(fn ($match) => $match->round->nama_ronde);
-    }
-
-    /**
      * All matches that have an actual schedule (date/time set), in
      * chronological order — the public livescore page's full list, covering
      * upcoming, currently-live, and finished-with-score matches alike.
@@ -32,7 +19,7 @@ class TournamentPublicService
     {
         return TournamentMatch::where('tournament_id', $tournament->id)
             ->whereNotNull('jadwal_tanggal')
-            ->with(['round', 'teamHome', 'teamAway', 'pemenang', 'homeJersey', 'awayJersey'])
+            ->with(['round', 'teamHome', 'teamAway', 'pemenang', 'homeJersey', 'awayJersey', 'venue'])
             ->orderBy('jadwal_tanggal')
             ->orderBy('jadwal_waktu')
             ->get();
@@ -49,6 +36,7 @@ class TournamentPublicService
             'status' => $match->status,
             'skor_home' => $match->skor_home,
             'skor_away' => $match->skor_away,
+            'babak' => $match->babak,
             'elapsed_seconds' => $match->status === 'live' ? $match->elapsedSeconds() : null,
             'is_paused' => $match->isPaused(),
         ])->values()->all();
@@ -61,7 +49,7 @@ class TournamentPublicService
      */
     public function buildMatchPayload(TournamentMatch $match): array
     {
-        $match->loadMissing(['round', 'teamHome', 'teamAway', 'pemenang', 'homeJersey', 'awayJersey', 'events.team', 'events.player', 'stat', 'penaltyShootout', 'penaltyKicks.team']);
+        $match->loadMissing(['round', 'teamHome', 'teamAway', 'pemenang', 'homeJersey', 'awayJersey', 'venue', 'events.team', 'events.player', 'stat', 'penaltyShootout', 'penaltyKicks.team']);
 
         return [
             'id' => $match->id,
@@ -74,11 +62,12 @@ class TournamentPublicService
             'away_jersey' => $match->awayJersey ? ['nama' => $match->awayJersey->nama, 'warna' => $match->awayJersey->warna] : null,
             'skor_home' => $match->skor_home,
             'skor_away' => $match->skor_away,
+            'babak' => $match->babak,
             'elapsed_seconds' => $match->status === 'live' ? $match->elapsedSeconds() : null,
             'is_paused' => $match->isPaused(),
             'jadwal_tanggal' => $match->jadwal_tanggal?->format('Y-m-d'),
             'jadwal_waktu' => $match->jadwal_waktu,
-            'lokasi' => $match->lokasi,
+            'lokasi' => $match->venueName(),
             'pemenang' => $match->pemenang?->nama_tim,
             'menang_via' => $match->menang_via,
             'penalti' => $match->penaltyShootout ? [
@@ -98,6 +87,7 @@ class TournamentPublicService
                 'tipe' => $event->tipe,
                 'tipe_label' => MatchEventType::from($event->tipe)->label(),
                 'menit' => $event->menit,
+                'babak' => $event->babak,
                 'catatan' => $event->catatan,
                 'team' => $event->team->nama_tim,
                 'pemain' => $event->player?->nama,

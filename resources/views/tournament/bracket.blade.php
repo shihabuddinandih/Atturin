@@ -72,35 +72,6 @@
             @endif
         </div>
     @endforeach
-
-    {{-- Schedule & results --}}
-    @foreach($scheduleByRound as $roundName => $roundMatches)
-        <div class="pro-card overflow-hidden">
-            <div class="p-5 border-b border-gray-100">
-                <h3 class="text-sm font-semibold text-gray-900">{{ $roundName }}</h3>
-            </div>
-            <div class="divide-y divide-gray-50">
-                @foreach($roundMatches as $match)
-                    <a href="{{ route('tournament.match.show', [$tournament, $match]) }}" class="p-5 flex items-center justify-between gap-4 hover:bg-gray-50/50 transition-colors">
-                        <div>
-                            <p class="text-sm font-semibold text-gray-800">{{ $match->teamHome->nama_tim ?? 'TBD' }} <span class="text-gray-300">vs</span> {{ $match->teamAway->nama_tim ?? 'TBD' }}</p>
-                            @if($match->jadwal_tanggal)
-                                <p class="text-xs text-gray-400 mt-0.5">{{ $match->jadwal_tanggal->translatedFormat('d M Y') }} &middot; {{ $match->jadwal_waktu }} @if($match->lokasi) &middot; {{ $match->lokasi }} @endif</p>
-                            @endif
-                        </div>
-                        <div class="text-right">
-                            @if($match->status === 'finished')
-                                <p class="text-sm font-bold text-gray-800">{{ $match->skor_home }} - {{ $match->skor_away }}</p>
-                            @endif
-                            <span class="inline-flex px-2 py-0.5 rounded-md text-[9px] font-bold tracking-wide uppercase bg-gray-100 text-gray-500">
-                                {{ \App\Enums\MatchStatus::from($match->status)->label() }}
-                            </span>
-                        </div>
-                    </a>
-                @endforeach
-            </div>
-        </div>
-    @endforeach
 </div>
 @endsection
 

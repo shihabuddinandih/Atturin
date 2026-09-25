@@ -98,6 +98,23 @@ class MatchController extends Controller
         return back()->with('success', 'Pertandingan dilanjutkan.');
     }
 
+    public function advanceBabak(Tournament $tournament, TournamentMatch $match)
+    {
+        $this->authorize('update', $tournament);
+
+        if ((int) $match->tournament_id !== (int) $tournament->id) {
+            abort(404);
+        }
+
+        try {
+            $this->matchLiveService->advanceBabak($match);
+        } catch (RuntimeException $e) {
+            return back()->with('error', $e->getMessage());
+        }
+
+        return back()->with('success', 'Lanjut ke babak berikutnya.');
+    }
+
     public function setJersey(Request $request, Tournament $tournament, TournamentMatch $match)
     {
         $this->authorize('update', $tournament);
