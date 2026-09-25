@@ -13,7 +13,7 @@
 
     {{-- Scoreboard --}}
     <div class="pro-card p-6" id="match-clock-root"
-         data-babak-started-at="{{ $match->babak_started_at?->toIso8601String() }}"
+         data-babak-started-at="{{ ($match->babak_started_at ?? $match->started_at)?->toIso8601String() }}"
          data-paused-at="{{ $match->paused_at?->toIso8601String() }}"
          data-total-paused-seconds="{{ $match->total_paused_seconds }}"
          data-status="{{ $match->status }}">

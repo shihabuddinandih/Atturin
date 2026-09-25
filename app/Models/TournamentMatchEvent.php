@@ -17,6 +17,10 @@ class TournamentMatchEvent extends Model
         'dicatat_oleh',
     ];
 
+    protected $casts = [
+        'babak' => 'integer',
+    ];
+
     public function match()
     {
         return $this->belongsTo(TournamentMatch::class, 'tournament_match_id');

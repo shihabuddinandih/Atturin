@@ -42,6 +42,7 @@ class TournamentMatch extends Model
         'jadwal_tanggal' => 'date',
         'started_at' => 'datetime',
         'paused_at' => 'datetime',
+        'babak' => 'integer',
         'babak_started_at' => 'datetime',
         'finished_at' => 'datetime',
         'penalty_started_at' => 'datetime',
@@ -163,7 +164,13 @@ class TournamentMatch extends Model
      */
     public function elapsedSeconds(): int
     {
-        if (! $this->babak_started_at) {
+        // Matches already live before babak_started_at existed fall back to
+        // their original kickoff time, so the clock self-heals without a
+        // manual data backfill — it starts behaving normally the moment the
+        // babak is next advanced.
+        $reference = $this->babak_started_at ?? $this->started_at;
+
+        if (! $reference) {
             return 0;
         }
 
@@ -173,7 +180,7 @@ class TournamentMatch extends Model
             return 0;
         }
 
-        return max(0, $end->getTimestamp() - $this->babak_started_at->getTimestamp() - $this->total_paused_seconds);
+        return max(0, $end->getTimestamp() - $reference->getTimestamp() - $this->total_paused_seconds);
     }
 
     public function elapsedMinutes(): int
