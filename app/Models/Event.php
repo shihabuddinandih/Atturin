@@ -34,6 +34,8 @@ class Event extends Model
         'join_code',
         'required_fields',
         'banner_image',
+        'team_draw_config',
+        'team_draw_published_at',
     ];
 
     protected $casts = [
@@ -46,6 +48,8 @@ class Event extends Model
         'facilities' => 'array',
         'enable_waiting_list' => 'boolean',
         'tanggal' => 'date',
+        'team_draw_config' => 'array',
+        'team_draw_published_at' => 'datetime',
     ];
 
     /**
@@ -102,6 +106,30 @@ class Event extends Model
             'payment_expires_at',
             'payment_snap_token'
         )->withTimestamps();
+    }
+
+    /**
+     * Teams created by the random team draw.
+     */
+    public function teams()
+    {
+        return $this->hasMany(EventTeam::class)->orderBy('urutan');
+    }
+
+    /**
+     * Team draw assignments (event_team_id null = cadangan).
+     */
+    public function teamPlayers()
+    {
+        return $this->hasMany(EventTeamPlayer::class);
+    }
+
+    /**
+     * Generated match schedule between the drawn teams.
+     */
+    public function matches()
+    {
+        return $this->hasMany(EventMatch::class)->orderBy('urutan');
     }
 
     // ─── Scopes ───────────────────────────────────────────────────

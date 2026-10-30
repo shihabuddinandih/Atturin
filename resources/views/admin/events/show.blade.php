@@ -124,6 +124,24 @@
         </div>
     </div>
 
+    {{-- Acak Tim & Jadwal --}}
+    <div class="pro-card p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div>
+            <div class="text-[11px] font-bold uppercase tracking-wider text-brand-500 mb-1">Acak Tim & Jadwal</div>
+            <p class="text-sm text-gray-600">
+                @if($event->teams()->exists())
+                    {{ $event->teams()->count() }} tim · {{ $event->matches()->count() }} laga ·
+                    {{ $event->team_draw_published_at ? 'tampil di publik' : 'belum dipublikasi' }}
+                @else
+                    Bagi peserta ke beberapa tim secara acak & seimbang, lalu buat jadwal pertandingan otomatis.
+                @endif
+            </p>
+        </div>
+        <a href="{{ route('admin.events.teamDraw.show', $event) }}" class="inline-flex items-center justify-center gap-2 bg-brand-500 hover:bg-brand-600 text-white font-semibold py-2.5 px-5 rounded-xl text-sm transition-colors whitespace-nowrap">
+            Kelola Tim
+        </a>
+    </div>
+
     {{-- Visibility Settings --}}
     <div class="pro-card p-5">
         <div class="text-[11px] font-bold uppercase tracking-wider text-violet-600 mb-3">Pengaturan Visibilitas Publik</div>

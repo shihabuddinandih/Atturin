@@ -411,6 +411,16 @@
                     @endif
                 </div>
 
+                @if($event->team_draw_published_at)
+                    <a href="{{ route('player.teams.show', $event->slug) }}" class="pro-card p-5 flex items-center justify-between gap-3 hover:border-brand-500 transition-colors">
+                        <div>
+                            <p class="text-[11px] font-bold uppercase tracking-wider text-brand-500">Pembagian Tim</p>
+                            <p class="text-sm text-gray-600 mt-0.5">Lihat tim dan jadwal pertandingan</p>
+                        </div>
+                        <svg class="w-5 h-5 text-brand-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
+                    </a>
+                @endif
+
                 {{-- Roster --}}
                 @if($event->show_joined_players_public)
                 <div class="pro-card p-6">

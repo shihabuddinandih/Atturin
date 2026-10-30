@@ -2,6 +2,8 @@
 
 use App\Http\Controllers\AdminDashboardController;
 use App\Http\Controllers\AdminEventController;
+use App\Http\Controllers\AdminEventTeamDrawController;
+use App\Http\Controllers\EventTeamPublicController;
 use App\Http\Controllers\AdminFinanceController;
 use App\Http\Controllers\AdminMemberController;
 use App\Http\Controllers\AdminSettingsController;
@@ -48,6 +50,13 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::post('events/{event}/payment/{player}', [AdminEventController::class, 'updatePayment'])->name('events.updatePayment');
         Route::post('events/{event}/contact/{player}', [AdminEventController::class, 'requestContact'])->name('events.requestContact');
 
+        // Acak tim & jadwal pertandingan
+        Route::get('events/{event}/acak-tim', [AdminEventTeamDrawController::class, 'show'])->name('events.teamDraw.show');
+        Route::post('events/{event}/acak-tim', [AdminEventTeamDrawController::class, 'draw'])->name('events.teamDraw.draw');
+        Route::post('events/{event}/acak-tim/jadwal', [AdminEventTeamDrawController::class, 'schedule'])->name('events.teamDraw.schedule');
+        Route::post('events/{event}/acak-tim/publikasi', [AdminEventTeamDrawController::class, 'publish'])->name('events.teamDraw.publish');
+        Route::delete('events/{event}/acak-tim', [AdminEventTeamDrawController::class, 'reset'])->name('events.teamDraw.reset');
+
         // Members (dedicated controller)
         Route::get('members', [AdminMemberController::class, 'index'])->name('members.index');
 
@@ -87,6 +96,7 @@ Route::post('/join/{slug}/midtrans/token', [PlayerJoinController::class, 'midtra
 Route::post('/join/{slug}/midtrans/finish', [PlayerJoinController::class, 'midtransFinish'])->name('player.join.midtrans.finish');
 Route::post('/join/{slug}/midtrans/status', [PlayerJoinController::class, 'midtransStatus'])->name('player.join.midtrans.status');
 Route::post('/join/{slug}/cancel', [PlayerJoinController::class, 'cancel'])->name('player.join.cancel');
+Route::get('/join/{slug}/tim', [EventTeamPublicController::class, 'show'])->name('player.teams.show');
 
 // Waiting list claim (public)
 Route::get('/waitlist/claim/{token}', [\App\Http\Controllers\WaitlistController::class, 'claim'])->name('waitlist.claim');
