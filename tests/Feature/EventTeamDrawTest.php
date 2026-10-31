@@ -74,7 +74,6 @@ class EventTeamDrawTest extends TestCase
     {
         return $this->actingAs($this->admin)->post(route('admin.events.teamDraw.draw', $event), array_merge([
             'jumlah_tim' => 3,
-            'pemain_per_tim' => 5,
         ], $payload));
     }
 
@@ -97,7 +96,7 @@ class EventTeamDrawTest extends TestCase
         $event = $this->makeEvent();
 
         $this->get(route('admin.events.teamDraw.show', $event))->assertRedirect(route('login'));
-        $this->post(route('admin.events.teamDraw.draw', $event), ['jumlah_tim' => 2, 'pemain_per_tim' => 5])->assertRedirect(route('login'));
+        $this->post(route('admin.events.teamDraw.draw', $event), ['jumlah_tim' => 2])->assertRedirect(route('login'));
     }
 
     public function test_regular_user_is_forbidden(): void
@@ -116,7 +115,7 @@ class EventTeamDrawTest extends TestCase
         $other = User::factory()->create(['role' => 'admin']);
 
         $this->actingAs($other)->get(route('admin.events.teamDraw.show', $event))->assertForbidden();
-        $this->actingAs($other)->post(route('admin.events.teamDraw.draw', $event), ['jumlah_tim' => 2, 'pemain_per_tim' => 5])->assertForbidden();
+        $this->actingAs($other)->post(route('admin.events.teamDraw.draw', $event), ['jumlah_tim' => 2])->assertForbidden();
         $this->actingAs($other)->post(route('admin.events.teamDraw.schedule', $event), ['jumlah_pertandingan' => 3])->assertForbidden();
         $this->actingAs($other)->post(route('admin.events.teamDraw.publish', $event), ['publish' => 1])->assertForbidden();
         $this->actingAs($other)->delete(route('admin.events.teamDraw.reset', $event))->assertForbidden();
@@ -149,23 +148,37 @@ class EventTeamDrawTest extends TestCase
 
     // ─── Acak tim ─────────────────────────────────────────────────
 
-    public function test_draw_creates_balanced_teams_with_cadangan(): void
+    public function test_draw_puts_every_player_in_a_team_without_cadangan(): void
     {
         $event = $this->makeEvent();
         $this->addPlayers($event, 17);
 
-        $this->draw($event)->assertRedirect(route('admin.events.teamDraw.show', $event))
-            ->assertSessionHas('success', 'Pemain berhasil diacak ke 3 tim. 2 pemain menjadi cadangan.');
+        $response = $this->draw($event)->assertRedirect(route('admin.events.teamDraw.show', $event));
 
         $teams = $event->teams()->withCount('members')->get();
+        $sizes = $teams->pluck('members_count')->all();
+        $response->assertSessionHas('success', 'Pemain berhasil diacak ke 3 tim (' . implode('/', $sizes) . ' pemain).');
+
         $this->assertSame(['Tim A', 'Tim B', 'Tim C'], $teams->pluck('nama_tim')->all());
-        $this->assertSame([5, 5, 5], $teams->pluck('members_count')->all());
-        $this->assertSame(2, $event->teamPlayers()->whereNull('event_team_id')->count());
+        sort($sizes);
+        $this->assertSame([5, 6, 6], $sizes);
+        $this->assertSame(0, $event->teamPlayers()->whereNull('event_team_id')->count());
         $this->assertSame(17, $event->teamPlayers()->distinct('player_id')->count('player_id'));
         // MySQL JSON tidak menjaga urutan key, jadi bandingkan setelah diurutkan.
         $config = $event->fresh()->team_draw_config;
         ksort($config);
-        $this->assertSame(['hanya_hadir' => false, 'jumlah_tim' => 3, 'pemain_per_tim' => 5], $config);
+        $this->assertSame(['hanya_hadir' => false, 'jumlah_tim' => 3], $config);
+    }
+
+    public function test_extra_pemain_per_tim_input_is_ignored(): void
+    {
+        $event = $this->makeEvent();
+        $this->addPlayers($event, 20);
+
+        $this->draw($event, ['jumlah_tim' => 2, 'pemain_per_tim' => 5])->assertSessionHas('success');
+
+        $this->assertSame([10, 10], $event->teams()->withCount('members')->pluck('members_count')->all());
+        $this->assertArrayNotHasKey('pemain_per_tim', $event->fresh()->team_draw_config);
     }
 
     public function test_draw_spreads_keepers(): void
@@ -216,7 +229,7 @@ class EventTeamDrawTest extends TestCase
         $this->schedule($event);
         $oldTeamIds = $event->teams()->pluck('id')->all();
 
-        $this->draw($event, ['jumlah_tim' => 4, 'pemain_per_tim' => 3])->assertSessionHas('success');
+        $this->draw($event, ['jumlah_tim' => 4])->assertSessionHas('success');
 
         $this->assertSame(4, $event->teams()->count());
         $this->assertSame(0, EventTeam::whereIn('id', $oldTeamIds)->count());
@@ -240,7 +253,7 @@ class EventTeamDrawTest extends TestCase
         $this->addPlayers($event, 6);
         $this->draw($event, ['jumlah_tim' => 2]);
 
-        $this->draw($event, ['jumlah_tim' => 10, 'pemain_per_tim' => 1])->assertSessionHas('error');
+        $this->draw($event, ['jumlah_tim' => 10])->assertSessionHas('error');
 
         $this->assertSame(2, $event->teams()->count());
         $this->assertSame(6, $event->teamPlayers()->count());
@@ -262,9 +275,8 @@ class EventTeamDrawTest extends TestCase
             'tim terlalu banyak' => [['jumlah_tim' => 27], 'jumlah_tim'],
             'tim bukan angka' => [['jumlah_tim' => 'abc'], 'jumlah_tim'],
             'tim desimal' => [['jumlah_tim' => 2.5], 'jumlah_tim'],
-            'pemain per tim nol' => [['pemain_per_tim' => 0], 'pemain_per_tim'],
-            'pemain per tim negatif' => [['pemain_per_tim' => -3], 'pemain_per_tim'],
-            'pemain per tim kosong' => [['pemain_per_tim' => ''], 'pemain_per_tim'],
+            'tim nol' => [['jumlah_tim' => 0], 'jumlah_tim'],
+            'tim negatif' => [['jumlah_tim' => -3], 'jumlah_tim'],
         ];
     }
 
@@ -282,9 +294,11 @@ class EventTeamDrawTest extends TestCase
     {
         $event = $this->makeEvent();
 
-        $this->draw($event, ['jumlah_tim' => 1, 'pemain_per_tim' => ''])->assertSessionHasErrors([
+        $this->draw($event, ['jumlah_tim' => 1])->assertSessionHasErrors([
             'jumlah_tim' => 'Kolom jumlah tim minimal 2.',
-            'pemain_per_tim' => 'Kolom pemain per tim wajib diisi.',
+        ]);
+        $this->draw($event, ['jumlah_tim' => ''])->assertSessionHasErrors([
+            'jumlah_tim' => 'Kolom jumlah tim wajib diisi.',
         ]);
         $this->schedule($event, ['jumlah_pertandingan' => 'enam'])->assertSessionHasErrors([
             'jumlah_pertandingan' => 'Kolom jumlah pertandingan harus berupa bilangan bulat.',
@@ -347,7 +361,7 @@ class EventTeamDrawTest extends TestCase
     {
         $event = $this->makeEvent();
         $this->addPlayers($event, 12);
-        $this->draw($event, ['jumlah_tim' => 4, 'pemain_per_tim' => 3]);
+        $this->draw($event, ['jumlah_tim' => 4]);
         $this->schedule($event);
 
         $this->schedule($event, ['jumlah_pertandingan' => 12])->assertSessionHas('success');
@@ -402,7 +416,9 @@ class EventTeamDrawTest extends TestCase
             ->assertSee('semua saling bertemu')
             ->assertSee('19:50')
             ->assertSee('Acak Ulang Tim')
-            ->assertSee('Belum dipublikasi');
+            ->assertSee('Belum dipublikasi')
+            ->assertDontSee('Cadangan')
+            ->assertDontSee('Pemain per Tim');
     }
 
     public function test_cancelled_player_after_draw_is_flagged(): void
@@ -454,19 +470,18 @@ class EventTeamDrawTest extends TestCase
         $this->schedule($event, ['durasi_laga' => 15]);
         $this->publish($event);
 
-        $player = EventTeamPlayer::where('event_id', $event->id)->whereNotNull('event_team_id')->with('player')->first()->player;
-        $reserve = EventTeamPlayer::where('event_id', $event->id)->whereNull('event_team_id')->with('player')->first()->player;
-
         $response = $this->get(route('player.teams.show', $event->slug))->assertOk();
         $response->assertSee('Mabar Jumat')
             ->assertSee('Tim A')->assertSee('Tim B')->assertSee('Tim C')
-            ->assertSee($player->nama)
-            ->assertSee('Cadangan')->assertSee($reserve->nama)
             ->assertSee('Jadwal Pertandingan')
             ->assertSee('Laga 6')
             ->assertSee('20:15')
-            ->assertDontSee($player->kontak)
-            ->assertDontSee($reserve->kontak);
+            ->assertDontSee('Cadangan');
+
+        // Semua pemain tampil, tanpa kontak.
+        foreach (EventTeamPlayer::where('event_id', $event->id)->with('player')->get() as $member) {
+            $response->assertSee($member->player->nama)->assertDontSee($member->player->kontak);
+        }
     }
 
     public function test_public_page_without_schedule(): void
@@ -540,7 +555,7 @@ class EventTeamDrawTest extends TestCase
         $this->addPlayers($first, 10);
         $this->addPlayers($second, 8);
         $this->draw($first, ['jumlah_tim' => 2]);
-        $this->draw($second, ['jumlah_tim' => 4, 'pemain_per_tim' => 2]);
+        $this->draw($second, ['jumlah_tim' => 4]);
         $this->schedule($second, ['jumlah_pertandingan' => 6]);
 
         $this->draw($first, ['jumlah_tim' => 2]);

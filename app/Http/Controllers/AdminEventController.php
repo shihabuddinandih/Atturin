@@ -36,21 +36,19 @@ class AdminEventController extends Controller
 
     public function store(Request $request)
     {
-        $request->merge(['skema_iuran' => $request->input('skema_iuran', 'flat')]);
+        $request->merge(['skema_iuran' => 'custom']);
 
         $validated = $request->validate([
             'nama_event' => 'required|string|max:255',
             'tanggal' => 'required|date',
             'waktu' => 'required',
             'tempat' => 'required|string|max:255',
-            'slot_max' => 'required_if:skema_iuran,flat|integer|min:1',
             'metode_pembayaran' => 'required|in:online_banking',
-            'biaya_total_event' => 'required_if:skema_iuran,flat|numeric|min:0',
-            'skema_iuran' => 'required|in:flat,custom',
-            'roles' => 'required_if:skema_iuran,custom|array|min:1',
-            'roles.*.name' => 'required_if:skema_iuran,custom|string|max:255',
-            'roles.*.slots' => 'required_if:skema_iuran,custom|integer|min:1',
-            'roles.*.price' => 'required_if:skema_iuran,custom|numeric|min:0',
+            'skema_iuran' => 'required|in:custom',
+            'roles' => 'required|array|min:1',
+            'roles.*.name' => 'required|string|max:255',
+            'roles.*.slots' => 'required|integer|min:1',
+            'roles.*.price' => 'required|numeric|min:0',
             'facilities' => 'nullable|array',
             'facilities.*.key' => 'required_with:facilities|string|in:' . implode(',', array_keys(FacilityCatalog::options())),
             'facilities.*.note' => 'nullable|string|max:255',
@@ -74,20 +72,16 @@ class AdminEventController extends Controller
 
         $validated['admin_id'] = auth()->id();
 
-        if ($validated['skema_iuran'] === 'custom') {
-            $roles = array_values(array_filter($validated['roles'], function ($role) {
-                return isset($role['name']) && trim($role['name']) !== '';
-            }));
+        $roles = array_values(array_filter($validated['roles'], function ($role) {
+            return isset($role['name']) && trim($role['name']) !== '';
+        }));
 
-            $totalSlots = array_sum(array_column($roles, 'slots'));
-            $validated['slot_max'] = max(1, $totalSlots);
-            $validated['roles'] = $roles;
-            $validated['biaya_total_event'] = array_sum(array_map(function ($role) {
-                return ((float) $role['price']) * ((int) $role['slots']);
-            }, $roles));
-        } else {
-            unset($validated['roles']);
-        }
+        $totalSlots = array_sum(array_column($roles, 'slots'));
+        $validated['slot_max'] = max(1, $totalSlots);
+        $validated['roles'] = $roles;
+        $validated['biaya_total_event'] = array_sum(array_map(function ($role) {
+            return ((float) $role['price']) * ((int) $role['slots']);
+        }, $roles));
 
         $validated['facilities'] = array_values(array_map(function ($facility) {
             return [

@@ -33,7 +33,6 @@ class AdminEventTeamDrawController extends Controller
             'matches.awayTeam',
         ]);
 
-        $cadangan = $event->teamPlayers()->whereNull('event_team_id')->with('player')->get();
         $joinStatuses = $event->players()->pluck('event_player.status_join', 'players.id');
 
         $gamesPerTeam = [];
@@ -46,7 +45,7 @@ class AdminEventTeamDrawController extends Controller
         $fairCounts = $this->scheduler->fairCounts(max(2, $event->teams->count()), 30);
 
         return view('admin.events.team-draw', compact(
-            'event', 'joinedCount', 'hadirCount', 'roleSummary', 'cadangan',
+            'event', 'joinedCount', 'hadirCount', 'roleSummary',
             'joinStatuses', 'gamesPerTeam', 'config', 'fairCounts'
         ));
     }
@@ -57,11 +56,9 @@ class AdminEventTeamDrawController extends Controller
 
         $validated = $request->validate([
             'jumlah_tim' => 'required|integer|min:2|max:' . TeamDrawService::MAX_TEAMS,
-            'pemain_per_tim' => 'required|integer|min:1|max:100',
             'hanya_hadir' => 'nullable|boolean',
         ], $this->messages(), [
             'jumlah_tim' => 'jumlah tim',
-            'pemain_per_tim' => 'pemain per tim',
         ]);
         $validated['hanya_hadir'] = $request->boolean('hanya_hadir');
 
@@ -71,10 +68,8 @@ class AdminEventTeamDrawController extends Controller
             return back()->withInput()->with('error', $e->getMessage());
         }
 
-        $message = 'Pemain berhasil diacak ke ' . count($result['teams']) . ' tim.';
-        if (count($result['cadangan']) > 0) {
-            $message .= ' ' . count($result['cadangan']) . ' pemain menjadi cadangan.';
-        }
+        $sizes = implode('/', array_map('count', $result['teams']));
+        $message = 'Pemain berhasil diacak ke ' . count($result['teams']) . ' tim (' . $sizes . ' pemain).';
 
         return redirect()->route('admin.events.teamDraw.show', $event)->with('success', $message);
     }

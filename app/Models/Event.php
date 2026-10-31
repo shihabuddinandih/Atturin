@@ -117,7 +117,7 @@ class Event extends Model
     }
 
     /**
-     * Team draw assignments (event_team_id null = cadangan).
+     * Team draw assignments (player → team).
      */
     public function teamPlayers()
     {

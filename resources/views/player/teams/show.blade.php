@@ -80,17 +80,6 @@
             @endforeach
         </div>
 
-        @if($cadangan->isNotEmpty())
-            <div class="pro-card p-5">
-                <p class="text-[11px] uppercase tracking-wider text-gray-400 font-semibold mb-2">Cadangan</p>
-                <div class="flex flex-wrap gap-2">
-                    @foreach($cadangan as $member)
-                        <span class="px-2.5 py-1 rounded-lg bg-gray-100 text-xs font-medium text-gray-700">{{ $member->player?->nama ?? '—' }}</span>
-                    @endforeach
-                </div>
-            </div>
-        @endif
-
         {{-- Schedule --}}
         @if($event->matches->isNotEmpty())
             <div class="pro-card overflow-hidden">

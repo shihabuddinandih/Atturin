@@ -18,8 +18,6 @@ class EventTeamPublicController extends Controller
             'matches.awayTeam',
         ]);
 
-        $cadangan = $event->teamPlayers()->whereNull('event_team_id')->with('player')->get();
-
-        return view('player.teams.show', compact('event', 'cadangan'));
+        return view('player.teams.show', compact('event'));
     }
 }

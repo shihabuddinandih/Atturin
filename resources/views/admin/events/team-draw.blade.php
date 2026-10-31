@@ -7,7 +7,6 @@
     $isPublished = $event->team_draw_published_at !== null;
     $publicUrl = route('player.teams.show', $event->slug);
     $defaultTim = old('jumlah_tim', $config['jumlah_tim'] ?? 2);
-    $defaultPerTim = old('pemain_per_tim', $config['pemain_per_tim'] ?? 5);
     $defaultHadir = old('hanya_hadir', $config['hanya_hadir'] ?? false);
     $defaultLaga = old('jumlah_pertandingan', $config['jumlah_pertandingan'] ?? ($fairCounts[0]['jumlah'] ?? 1));
     $defaultDurasi = old('durasi_laga', $config['durasi_laga'] ?? null);
@@ -83,15 +82,10 @@
         <form action="{{ route('admin.events.teamDraw.draw', $event) }}" method="POST" id="draw-form" class="space-y-4"
               @if($hasTeams) onsubmit="return confirm('Hasil acak dan jadwal sebelumnya akan diganti. Lanjutkan?')" @endif>
             @csrf
-            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <label class="block">
                     <span class="block text-xs font-semibold text-gray-600 mb-1">Jumlah Tim</span>
                     <input type="number" name="jumlah_tim" id="jumlah_tim" min="2" max="{{ \App\Services\TeamDrawService::MAX_TEAMS }}" value="{{ $defaultTim }}" required
-                           class="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm focus:border-brand-500 focus:ring-brand-500">
-                </label>
-                <label class="block">
-                    <span class="block text-xs font-semibold text-gray-600 mb-1">Pemain per Tim</span>
-                    <input type="number" name="pemain_per_tim" id="pemain_per_tim" min="1" max="100" value="{{ $defaultPerTim }}" required
                            class="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm focus:border-brand-500 focus:ring-brand-500">
                 </label>
                 <label class="flex items-center gap-3 p-3 rounded-xl border border-gray-100 hover:border-brand-200 cursor-pointer transition-all sm:mt-5">
@@ -139,19 +133,6 @@
                 </div>
             @endforeach
         </div>
-
-        @if($cadangan->isNotEmpty())
-            <div class="pro-card p-5">
-                <p class="text-[11px] uppercase tracking-wider text-gray-400 font-semibold mb-2">Cadangan ({{ $cadangan->count() }})</p>
-                <div class="flex flex-wrap gap-2">
-                    @foreach($cadangan as $member)
-                        <span class="px-2.5 py-1 rounded-lg bg-gray-100 text-xs font-medium text-gray-700">
-                            {{ $member->player?->nama ?? 'Pemain dihapus' }}@if($member->role_name) <span class="text-gray-400">· {{ $member->role_name }}</span>@endif
-                        </span>
-                    @endforeach
-                </div>
-            </div>
-        @endif
 
         {{-- Step 2: Jadwal --}}
         <div class="pro-card p-5">
@@ -272,17 +253,15 @@
         const joined = {{ $joinedCount }};
         const hadir = {{ $hadirCount }};
         const timInput = document.getElementById('jumlah_tim');
-        const perTimInput = document.getElementById('pemain_per_tim');
         const hadirInput = document.getElementById('hanya_hadir');
         const preview = document.getElementById('draw-preview');
 
         function renderPreview() {
             const pool = hadirInput.checked ? hadir : joined;
             const tim = parseInt(timInput.value, 10) || 0;
-            const perTim = parseInt(perTimInput.value, 10) || 0;
 
-            if (tim < 2 || perTim < 1) {
-                preview.innerHTML = '<span class="text-rose-600">Minimal 2 tim dan 1 pemain per tim.</span>';
+            if (tim < 2) {
+                preview.innerHTML = '<span class="text-rose-600">Minimal 2 tim.</span>';
                 return;
             }
             if (pool < tim) {
@@ -290,18 +269,16 @@
                 return;
             }
 
-            const capacity = tim * perTim;
-            const playing = Math.min(pool, capacity);
-            const base = Math.floor(playing / tim);
-            const extra = playing % tim;
-            const sizes = extra === 0 ? `${base} pemain` : `${base}–${base + 1} pemain`;
-            const cadangan = Math.max(0, pool - capacity);
+            const base = Math.floor(pool / tim);
+            const extra = pool % tim;
+            const sizes = extra === 0
+                ? `${base} pemain`
+                : `${base + 1} pemain (${extra} tim) dan ${base} pemain (${tim - extra} tim)`;
 
-            preview.innerHTML = `<b>${pool}</b> pemain tersedia → <b>${tim}</b> tim berisi <b>${sizes}</b>`
-                + (cadangan > 0 ? `, <b>${cadangan}</b> pemain menjadi cadangan.` : '.');
+            preview.innerHTML = `<b>${pool}</b> pemain tersedia → <b>${tim}</b> tim berisi <b>${sizes}</b>. Semua pemain masuk tim.`;
         }
 
-        [timInput, perTimInput, hadirInput].forEach((el) => el.addEventListener('input', renderPreview));
+        [timInput, hadirInput].forEach((el) => el.addEventListener('input', renderPreview));
         hadirInput.addEventListener('change', renderPreview);
         renderPreview();
 

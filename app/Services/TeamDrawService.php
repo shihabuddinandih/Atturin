@@ -19,12 +19,13 @@ class TeamDrawService
     ];
 
     /**
-     * Bagi pemain ke tim secara acak & seimbang (murni, tanpa DB).
+     * Bagi semua pemain ke tim secara acak & seimbang (murni, tanpa DB). Tidak ada cadangan:
+     * setiap pemain masuk tim dan selisih jumlah anggota antar tim maksimal 1.
      *
      * @param  array<int, array{player_id:int, role_name:?string}>  $pool
-     * @return array{teams: array<int, array<int, array{player_id:int, role_name:?string}>>, cadangan: array<int, array{player_id:int, role_name:?string}>}
+     * @return array{teams: array<int, array<int, array{player_id:int, role_name:?string}>>}
      */
-    public function assign(array $pool, int $jumlahTim, int $perTim): array
+    public function assign(array $pool, int $jumlahTim): array
     {
         if ($jumlahTim < 2) {
             throw new RuntimeException('Jumlah tim minimal 2.');
@@ -32,10 +33,6 @@ class TeamDrawService
 
         if ($jumlahTim > self::MAX_TEAMS) {
             throw new RuntimeException('Jumlah tim maksimal ' . self::MAX_TEAMS . '.');
-        }
-
-        if ($perTim < 1) {
-            throw new RuntimeException('Jumlah pemain per tim minimal 1.');
         }
 
         if (count($pool) < $jumlahTim) {
@@ -63,18 +60,14 @@ class TeamDrawService
 
         $teams = array_fill(0, $jumlahTim, []);
         $roleCounts = array_fill(0, $jumlahTim, []);
-        $cadangan = [];
 
         foreach ($ordered as $entry) {
             $role = (string) ($entry['role_name'] ?? '');
             $candidates = [];
             $bestKey = null;
 
+            // Masuk ke tim dengan anggota paling sedikit, lalu yang paling sedikit memiliki peran ini.
             foreach ($teams as $index => $members) {
-                if (count($members) >= $perTim) {
-                    continue;
-                }
-
                 $key = [count($members), $roleCounts[$index][$role] ?? 0];
                 if ($bestKey === null || $key < $bestKey) {
                     $bestKey = $key;
@@ -84,23 +77,18 @@ class TeamDrawService
                 }
             }
 
-            if ($candidates === []) {
-                $cadangan[] = $entry;
-                continue;
-            }
-
             $target = $candidates[array_rand($candidates)];
             $teams[$target][] = $entry;
             $roleCounts[$target][$role] = ($roleCounts[$target][$role] ?? 0) + 1;
         }
 
-        return ['teams' => $teams, 'cadangan' => $cadangan];
+        return ['teams' => $teams];
     }
 
     /**
      * Ambil peserta event, acak ke tim, lalu simpan (menggantikan hasil sebelumnya).
      *
-     * @param  array{jumlah_tim:int, pemain_per_tim:int, hanya_hadir:bool}  $config
+     * @param  array{jumlah_tim:int, hanya_hadir:bool}  $config
      */
     public function draw(Event $event, array $config): array
     {
@@ -114,7 +102,7 @@ class TeamDrawService
             'role_name' => $player->pivot->role_name,
         ])->all();
 
-        $result = $this->assign($pool, (int) $config['jumlah_tim'], (int) $config['pemain_per_tim']);
+        $result = $this->assign($pool, (int) $config['jumlah_tim']);
 
         DB::transaction(function () use ($event, $config, $result) {
             EventMatch::where('event_id', $event->id)->delete();
@@ -137,18 +125,9 @@ class TeamDrawService
                 }
             }
 
-            foreach ($result['cadangan'] as $member) {
-                $event->teamPlayers()->create([
-                    'event_team_id' => null,
-                    'player_id' => $member['player_id'],
-                    'role_name' => $member['role_name'],
-                ]);
-            }
-
             $event->update([
                 'team_draw_config' => [
                     'jumlah_tim' => (int) $config['jumlah_tim'],
-                    'pemain_per_tim' => (int) $config['pemain_per_tim'],
                     'hanya_hadir' => (bool) ($config['hanya_hadir'] ?? false),
                 ],
             ]);

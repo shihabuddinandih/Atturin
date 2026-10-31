@@ -38,7 +38,7 @@
 
     {{-- 2. Filter Navigation & Search --}}
     <div class="flex flex-wrap items-center justify-between gap-4">
-        <div class="flex items-center gap-1.5 p-1 bg-gray-100 rounded-xl">
+        <div class="flex max-w-full items-center gap-1.5 overflow-x-auto p-1 bg-gray-100 rounded-xl">
             <a href="{{ route('admin.events.index', ['status' => 'all']) }}" 
                class="px-4 py-2 rounded-lg text-xs font-semibold transition-all {{ $status === 'all' ? 'bg-white text-brand-600 shadow-sm' : 'text-gray-500 hover:text-gray-800' }}">
                 Semua
@@ -60,7 +60,7 @@
 
     {{-- 3. Table list --}}
     <div class="pro-card overflow-hidden">
-        <div class="overflow-x-auto">
+        <div class="relative overflow-x-auto">
             <table class="min-w-full">
                 <thead>
                     <tr class="border-b border-gray-100 bg-gray-50/20">
@@ -96,8 +96,8 @@
                                         {{ $event->metode_pembayaran === 'online_banking' ? 'Online' : 'Tunai' }}
                                     </span>
                                     <span class="inline-flex px-2 py-0.5 rounded-md text-[9px] font-bold tracking-wide uppercase
-                                        {{ $event->skema_iuran === 'loyalitas' ? 'bg-purple-50 text-purple-700' : 'bg-gray-100 text-gray-500' }}">
-                                        {{ $event->skema_iuran === 'loyalitas' ? 'Loyalty' : 'Flat' }}
+                                        {{ $event->skema_iuran === 'loyalitas' ? 'bg-purple-50 text-purple-700' : ($event->skema_iuran === 'custom' ? 'bg-brand-50 text-brand-700' : 'bg-gray-100 text-gray-500') }}">
+                                        {{ $event->skema_iuran === 'loyalitas' ? 'Loyalty' : ($event->skema_iuran === 'custom' ? 'Custom' : 'Flat') }}
                                     </span>
                                 </div>
                             </td>
@@ -144,7 +144,7 @@
                                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
                                     </a>
                                     {{-- Share --}}
-                                    <input type="text" readonly value="{{ route('player.join.show', $event->slug) }}" class="opacity-0 absolute -z-10" id="share-link-{{ $event->id }}">
+                                    <input type="text" readonly value="{{ route('player.join.show', $event->slug) }}" class="sr-only" tabindex="-1" aria-hidden="true" id="share-link-{{ $event->id }}">
                                     <button type="button" onclick="copyEventLink({{ $event->id }})"
                                             class="p-2 rounded-lg bg-brand-50 hover:bg-brand-100 text-brand-600 border border-brand-100 transition-colors" title="Salin Link Join">
                                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">

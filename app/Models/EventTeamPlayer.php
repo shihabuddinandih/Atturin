@@ -22,9 +22,4 @@ class EventTeamPlayer extends Model
     {
         return $this->belongsTo(Player::class)->withTrashed();
     }
-
-    public function isCadangan(): bool
-    {
-        return $this->event_team_id === null;
-    }
 }
