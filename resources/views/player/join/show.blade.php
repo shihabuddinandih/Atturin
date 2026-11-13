@@ -227,7 +227,7 @@
                             </div>
                             <span class="rounded-full bg-brand-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-brand-600">Kuota real-time</span>
                         </div>
-                        <p class="mb-4 text-xs text-gray-500">Harga sudah termasuk biaya admin pembayaran.</p>
+                        <p class="mb-4 text-xs text-gray-500">Pilih posisi yang ingin Anda isi.</p>
 
                         <div class="space-y-3">
                             @foreach($roleData as $role)
@@ -339,8 +339,6 @@
                                 {{-- Rincian biaya --}}
                                 <dl class="space-y-1.5 border-t border-dashed border-gray-200 pt-3 text-xs">
                                     @if($isCustomEvent)
-                                        <div class="flex justify-between gap-2 text-gray-500"><dt>Biaya posisi</dt><dd id="sum-price">-</dd></div>
-                                        <div class="flex justify-between gap-2 text-gray-500"><dt>Biaya layanan QRIS</dt><dd id="sum-admin">-</dd></div>
                                         <div class="flex justify-between gap-2 pt-1 text-sm font-bold text-gray-900"><dt>Total</dt><dd id="sum-total" class="text-brand-600">-</dd></div>
                                     @elseif($event->skema_iuran === 'loyalitas')
                                         <div class="flex justify-between gap-2 text-sm font-bold text-gray-900"><dt>Estimasi biaya</dt><dd class="text-brand-600">{{ $rupiah($minEst) }} – {{ $rupiah($maxEst) }}</dd></div>
@@ -515,8 +513,6 @@
             const set = (id, text) => { const el = document.getElementById(id); if (el) el.textContent = text; };
             set('sum-role', role.name);
             set('sum-total-head', role.total > 0 ? rupiah(role.total) : 'Gratis');
-            set('sum-price', role.price > 0 ? rupiah(role.price) : 'Gratis');
-            set('sum-admin', rupiah(role.admin_fee));
             set('sum-total', role.total > 0 ? rupiah(role.total) : 'Gratis');
 
             const warning = document.getElementById('sum-warning');

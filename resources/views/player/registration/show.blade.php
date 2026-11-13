@@ -252,8 +252,6 @@
                     <div class="mt-5 rounded-2xl border border-gray-100 bg-gray-50/60 p-6 text-center">
                         <p class="text-[10px] font-bold uppercase tracking-wider text-gray-400">Total yang harus dibayar</p>
                         <p class="mt-1 text-4xl font-bold text-gray-900">{{ $rupiah($paymentAmount) }}</p>
-                        <p class="mt-1 text-xs font-semibold text-brand-500">Sudah termasuk biaya layanan</p>
-
                         @if($isOnline && !$isCancelled)
                             <button id="midtrans-pay-button" type="button" class="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-brand-500 py-3.5 text-sm font-bold text-white shadow-lg shadow-brand-500/25 transition-all hover:bg-brand-600 disabled:opacity-60">
                                 <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"/></svg>
@@ -307,7 +305,7 @@
                             <div class="flex justify-between gap-3 py-3"><dt class="text-gray-500">Posisi</dt><dd class="text-right font-semibold text-gray-900">{{ $roleName ?: 'Peserta' }}</dd></div>
                             <div class="flex justify-between gap-3 py-3"><dt class="text-gray-500">Metode</dt><dd class="text-right font-semibold text-brand-600">{{ $isOnline ? 'QRIS (Midtrans)' : 'Tunai' }}</dd></div>
                             <div class="flex items-end justify-between gap-3 py-3">
-                                <dt><span class="block font-bold text-gray-900">Total</span><span class="text-[11px] text-gray-400">Termasuk biaya layanan</span></dt>
+                                <dt class="font-bold text-gray-900">Total</dt>
                                 <dd class="text-2xl font-bold text-brand-600">{{ $rupiah($paymentAmount) }}</dd>
                             </div>
                         </dl>
