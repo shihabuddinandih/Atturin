@@ -464,9 +464,11 @@
                                 window.location.href = registrationUrl;
                             },
                             onPending: async (result) => {
-                                await postJson(finishUrl, result);
-                                pollingActive = false;
-                                window.location.href = registrationUrl;
+                                // QRIS sudah dibuat tapi belum dibayar (biasanya terpicu saat popup ditutup).
+                                // Jangan muat ulang halaman: biarkan polling memantau, dan tombol bisa dipakai
+                                // untuk membuka QR yang sama selama belum kedaluwarsa.
+                                payButton.disabled = false;
+                                await redirectIfPaid();
                             },
                             onError: async (result) => {
                                 await postJson(finishUrl, result);
@@ -547,7 +549,13 @@
                     };
                     const timer = setInterval(tick, 1000);
                     tick();
-                    if (payButton && deadline > Date.now()) {
+                    // Buka QRIS otomatis hanya sekali (kunjungan pertama setelah daftar).
+                    // Setelah ditutup, QR hanya dibuka lagi lewat tombol.
+                    const autoOpenKey = 'qris-auto-opened:' + @json($token);
+                    let alreadyOpened = false;
+                    try { alreadyOpened = sessionStorage.getItem(autoOpenKey) === '1'; } catch (e) { alreadyOpened = true; }
+                    if (payButton && deadline > Date.now() && !alreadyOpened) {
+                        try { sessionStorage.setItem(autoOpenKey, '1'); } catch (e) { /* abaikan */ }
                         payButton.click();
                     }
                 }
