@@ -6,6 +6,7 @@
     <title>Status Pendaftaran — {{ config('app.name', 'Atturin') }}</title>
     <link rel="icon" type="image/png" href="{{ asset('images/Logo/Logo (Lettermark)/Primary Dark.png') }}">
     <meta name="csrf-token" content="{{ csrf_token() }}">
+    <meta name="robots" content="noindex">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Lexend:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
@@ -15,7 +16,7 @@
             theme: {
                 extend: {
                     colors: {
-                        brand: { 50:'#E6EEFF', 500:'#0052FF', 600:'#0042CC', 700:'#003199', 900:'#0A1628' },
+                        brand: { 50:'#E6EEFF', 100:'#CCDDFF', 500:'#0052FF', 600:'#0042CC', 700:'#003199', 900:'#0A1628' },
                         lime: { 400:'#ABD600', 500:'#9BC200' },
                         surface: '#F0F2F5',
                     },
@@ -37,166 +38,340 @@
         @keyframes checkPop { 0%{transform:scale(0);opacity:0;} 60%{transform:scale(1.15);} 100%{transform:scale(1);opacity:1;} }
         .fade-up { animation: fadeUp 0.4s ease-out; }
         @keyframes fadeUp { from{opacity:0;transform:translateY(12px);} to{opacity:1;transform:translateY(0);} }
+        .ticket-notch { position:absolute; top:-12px; width:24px; height:24px; border-radius:9999px; background:#F0F2F5; }
     </style>
 </head>
 <body class="bg-surface min-h-screen">
 
+    @php
+        $status = $latestJoin ? $latestJoin->pivot->payment_status : 'pending';
+        $computeAdminFee = fn (float $base, string $method) => \App\Support\PaymentFee::adminFee($base, $method);
+        $paymentAmount = $latestJoin
+            ? (float) $latestJoin->pivot->payment_amount
+            : (float) $event->iuran_per_pemain + $computeAdminFee((float) $event->iuran_per_pemain, $event->metode_pembayaran);
+        $rupiah = fn ($v) => 'Rp ' . number_format((float) $v, 0, ',', '.');
+
+        $joinStatus = $latestJoin?->pivot->status_join;
+        $isHold = $joinStatus === 'hold';
+        $isCancelled = $joinStatus === 'batal';
+        $isPaid = $status === 'paid' && !$isCancelled;
+        $isOnline = $latestJoin && $latestJoin->pivot->payment_method === 'online_banking';
+        $roleName = $latestJoin?->pivot->role_name;
+        $waktu = \Illuminate\Support\Str::substr((string) $event->waktu, 0, 5);
+        $tanggalLabel = \Carbon\Carbon::parse($event->tanggal)->translatedFormat('l, d F Y');
+        $registrationCode = strtoupper(substr($token, 0, 4) . '-' . substr($token, 4, 4));
+
+        // Google Calendar (waktu event diisi dalam WIB)
+        $start = \Carbon\Carbon::parse(\Carbon\Carbon::parse($event->tanggal)->format('Y-m-d') . ' ' . $waktu, 'Asia/Jakarta');
+        $calendarUrl = 'https://calendar.google.com/calendar/render?' . http_build_query([
+            'action' => 'TEMPLATE',
+            'text' => $event->nama_event,
+            'dates' => $start->copy()->utc()->format('Ymd\THis\Z') . '/' . $start->copy()->addHours(2)->utc()->format('Ymd\THis\Z'),
+            'location' => $event->tempat,
+            'details' => 'Status pendaftaran: ' . route('registration.show', $token),
+        ]);
+    @endphp
+
     {{-- Navbar --}}
-    <nav class="bg-[#0A1628] border-b border-slate-800 text-white">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <nav class="bg-brand-900 border-b border-slate-800 text-white">
+        <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex items-center justify-between h-14">
                 <img src="{{ asset('images/Logo/Horizontal/Secondary.png') }}" class="h-8 object-contain" alt="{{ config('app.name', 'Atturin') }}">
-                <!-- <div class="hidden md:flex items-center gap-6 text-sm font-medium text-slate-300">
-                    <a href="#" class="hover:text-white transition-colors">Events</a>
-                    <a href="#" class="hover:text-white transition-colors">My Schedule</a>
-                    <a href="#" class="hover:text-white transition-colors">Payments</a>
-                </div> -->
+                <a href="{{ route('player.join.show', $event->slug) }}" class="text-xs font-semibold text-white/70 hover:text-white">Lihat Event</a>
             </div>
         </div>
     </nav>
 
-    @php
-        $status = $latestJoin ? $latestJoin->pivot->payment_status : 'pending';
-        $statusLabel = strtoupper($status);
+    <main class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-10 fade-up">
+        {{-- Flash --}}
+        @if(session('success'))
+            <div class="mb-5 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{{ session('success') }}</div>
+        @endif
+        @if(session('error'))
+            <div class="mb-5 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{{ session('error') }}</div>
+        @endif
+        @if(session('info'))
+            <div class="mb-5 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-700">{{ session('info') }}</div>
+        @endif
 
-        $computeAdminFee = function (float $base, string $method) {
-            if ($method !== 'online_banking') {
-                return 0.0;
-            }
-            if ($base <= 49000) {
-                return 1500.0;
-            }
-            if ($base <= 99000) {
-                return 3000.0;
-            }
-            return (float) ($base * 0.03);
-        };
-
-        if ($latestJoin) {
-            $paymentAmount = (float) $latestJoin->pivot->payment_amount;
-        } else {
-            $basePrice = (float) $event->iuran_per_pemain;
-            $paymentAmount = $basePrice + $computeAdminFee($basePrice, $event->metode_pembayaran);
-        }
-    @endphp
-
-    <div class="max-w-xl mx-auto px-4 py-10 fade-up">
-        <div class="pro-card p-6 sm:p-8">
-            {{-- Flash Messages --}}
-            @if(session('success'))
-                <div class="mb-5 flex items-center gap-3 bg-emerald-50 border border-emerald-200 text-emerald-700 px-4 py-3 rounded-xl text-sm">
-                    <svg class="w-5 h-5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
-                    {{ session('success') }}
+        @if($isCancelled)
+            {{-- ═══ Pendaftaran gugur ═══ --}}
+            <div class="pro-card mx-auto max-w-lg p-6 sm:p-8 text-center">
+                <div class="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-rose-100">
+                    <svg class="h-8 w-8 text-rose-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
                 </div>
-            @endif
+                <h1 class="text-2xl font-bold text-gray-900">Pendaftaran Batal</h1>
+                <p class="mt-2 text-sm text-gray-500">Pendaftaran Anda di <span class="font-semibold text-gray-800">{{ $event->nama_event }}</span> tidak berlaku lagi dan slot sudah dilepas.</p>
+                <p class="mt-1 text-sm text-gray-500">Silakan daftar ulang jika slot masih tersedia.</p>
+                <a href="{{ route('player.join.show', $event->slug) }}" class="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-brand-500 px-4 py-3 text-sm font-bold text-white hover:bg-brand-600">Daftar Ulang</a>
+            </div>
 
-            @if(session('error'))
-                <div class="mb-5 flex items-center gap-3 bg-rose-50 border border-rose-200 text-rose-700 px-4 py-3 rounded-xl text-sm">
-                    <svg class="w-5 h-5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/></svg>
-                    {{ session('error') }}
-                </div>
-            @endif
-
-            {{-- Success Icon --}}
+        @elseif($isPaid)
+            {{-- ═══ Tiket: Anda terdaftar ═══ --}}
             <div class="text-center">
-                <div class="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-emerald-100 mb-5 check-pop">
-                    <svg class="h-8 w-8 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/>
-                    </svg>
+                <div class="check-pop mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-lime-400 shadow-lg shadow-lime-400/40">
+                    <svg class="h-10 w-10 text-brand-900" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>
                 </div>
-                <h1 class="text-2xl font-bold text-gray-900">Registrasi Berhasil!</h1>
-                <p class="text-sm text-gray-500 mt-2">Anda sudah tercatat di event <span class="font-semibold text-gray-800">{{ $event->nama_event }}</span>.</p>
-                <p class="text-sm text-gray-500 mt-2">Bayar kapan saja sebelum event dimulai dengan tombol pembayaran di bawah.</p>
+                <span class="mt-5 inline-flex items-center gap-2 rounded-full bg-gray-200/70 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-gray-700">
+                    <span class="h-1.5 w-1.5 rounded-full bg-lime-500"></span>
+                    {{ $paymentAmount > 0 ? 'Pendaftaran terkonfirmasi · Lunas' : 'Pendaftaran terkonfirmasi · Gratis' }}
+                </span>
+                <h1 class="mt-3 text-3xl sm:text-4xl font-bold text-gray-900">Anda Terdaftar!</h1>
+                <p class="mx-auto mt-2 max-w-md text-sm text-gray-500">
+                    @if($paymentAmount > 0)
+                        Pembayaran <span class="font-bold text-gray-900">{{ $rupiah($paymentAmount) }}</span> berhasil.
+                    @endif
+                    Slot {{ $roleName ? 'posisi ' . $roleName : 'Anda' }} sudah resmi masuk roster.
+                </p>
             </div>
 
-            {{-- Send to own WhatsApp --}}
-            <!-- @if($whatsappShareUrl)
-                <a href="{{ $whatsappShareUrl }}" target="_blank" rel="noopener"
-                    class="mt-5 w-full inline-flex items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700 hover:bg-emerald-100 transition-colors">
-                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12.002 2C6.478 2 2 6.477 2 12c0 1.851.505 3.586 1.386 5.076L2 22l5.058-1.328A9.94 9.94 0 0012.002 22C17.525 22 22 17.523 22 12S17.525 2 12.002 2zm0 18.09c-1.66 0-3.207-.487-4.508-1.324l-.323-.204-3.003.788.802-2.928-.21-.301A8.076 8.076 0 013.91 12c0-4.463 3.63-8.09 8.092-8.09 4.462 0 8.09 3.627 8.09 8.09 0 4.462-3.628 8.09-8.09 8.09z"/></svg>
-                    Kirim ke WhatsApp saya
-                </a>
-            @endif -->
-
-            {{-- Event Details --}}
-            <div class="mt-6 rounded-xl border border-gray-200 bg-gray-50 p-5 space-y-3">
-                <div class="flex items-center justify-between text-sm">
-                    <span class="text-gray-500 flex items-center gap-2">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-                        Jadwal
-                    </span>
-                    <span class="font-semibold text-gray-800">{{ \Carbon\Carbon::parse($event->tanggal)->format('d M Y') }}, {{ $event->waktu }}</span>
-                </div>
-                <div class="flex items-center justify-between text-sm">
-                    <span class="text-gray-500 flex items-center gap-2">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/></svg>
-                        Lokasi
-                    </span>
-                    <span class="font-semibold text-gray-800">{{ $event->tempat }}</span>
-                </div>
-                <div class="flex items-center justify-between text-sm">
-                    <span class="text-gray-500 flex items-center gap-2">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1"/></svg>
-                        Iuran Anda
-                    </span>
-                    <span class="font-bold text-brand-500">
-                        Rp {{ number_format($paymentAmount, 0, ',', '.') }}
-                    </span>
-                </div>
-                <div class="flex items-center justify-between text-sm">
-                    <span class="text-gray-500">Metode</span>
-                    <span class="font-semibold text-gray-800">{{ $event->metode_pembayaran === 'online_banking' ? 'Online Banking' : 'Tunai' }}</span>
-                </div>
-            </div>
-
-            {{-- Payment Status --}}
-            @if($latestJoin)
-                <div class="mt-4 rounded-xl border border-brand-100 bg-brand-50 p-5">
-                    <div class="flex items-center justify-between">
-                        <span class="text-sm font-semibold text-gray-800">Status Pembayaran</span>
-                        <span class="px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider
-                            {{ $status === 'paid' ? 'bg-emerald-100 text-emerald-700' : ($status === 'failed' ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700') }}">
-                            {{ $statusLabel }}
-                        </span>
+            <div class="relative mx-auto mt-8 max-w-3xl overflow-hidden rounded-3xl bg-white shadow-xl ring-1 ring-gray-200">
+                <div class="bg-brand-900 px-6 py-6 sm:px-8 text-white">
+                    <div class="flex flex-wrap items-start justify-between gap-3">
+                        <div class="min-w-0">
+                            <span class="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-lime-400">✓ Tiket resmi {{ config('app.name', 'Atturin') }}</span>
+                            <h2 class="mt-3 text-2xl font-bold break-words">{{ $event->nama_event }}</h2>
+                            <p class="mt-2 text-sm text-white/80">{{ $tanggalLabel }} · {{ $waktu }} WIB</p>
+                            <p class="mt-1 text-sm text-white/60">{{ $event->tempat }}</p>
+                        </div>
+                        <span class="rounded-full bg-brand-500 px-3 py-1 text-[10px] font-bold uppercase tracking-wider">Event Komunitas</span>
                     </div>
-                    @if($latestJoin->pivot->payment_reference)
-                        <p class="mt-2 text-xs text-gray-400">Ref: {{ $latestJoin->pivot->payment_reference }}</p>
+                </div>
+                <div class="relative border-t-2 border-dashed border-gray-200">
+                    <span class="ticket-notch -left-3"></span>
+                    <span class="ticket-notch -right-3"></span>
+                </div>
+                <dl class="grid grid-cols-1 gap-5 px-6 py-6 sm:grid-cols-2 sm:px-8">
+                    <div>
+                        <dt class="text-[10px] font-bold uppercase tracking-wider text-gray-400">Peserta</dt>
+                        <dd class="mt-1 text-lg font-bold text-gray-900 break-words">{{ $latestJoin->nama }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-[10px] font-bold uppercase tracking-wider text-gray-400">Posisi</dt>
+                        <dd class="mt-1 text-lg font-bold text-gray-900">{{ $roleName ?: 'Peserta' }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-[10px] font-bold uppercase tracking-wider text-gray-400">Kode Pendaftaran</dt>
+                        <dd class="mt-1 flex items-center gap-2">
+                            <span class="text-lg font-bold text-brand-600 tracking-wider" id="reg-code">{{ $registrationCode }}</span>
+                            <button type="button" class="copy-btn rounded-md bg-gray-100 px-2 py-1 text-[11px] font-semibold text-gray-600 hover:bg-gray-200" data-copy="{{ $registrationCode }}">Salin</button>
+                        </dd>
+                        <p class="mt-0.5 text-[11px] text-gray-400">Tunjukkan ke penyelenggara saat hari-H</p>
+                    </div>
+                    <div>
+                        <dt class="text-[10px] font-bold uppercase tracking-wider text-gray-400">Status Pembayaran</dt>
+                        <dd class="mt-1 text-lg font-bold text-lime-600">{{ $paymentAmount > 0 ? 'LUNAS ' . $rupiah($paymentAmount) : 'GRATIS' }}</dd>
+                        @if($latestJoin->pivot->payment_reference)
+                            <p class="mt-0.5 text-[11px] text-gray-400 break-all">Ref: {{ $latestJoin->pivot->payment_reference }}</p>
+                        @endif
+                    </div>
+                </dl>
+            </div>
+
+            <section class="pro-card mx-auto mt-6 max-w-3xl p-5 sm:p-6">
+                <h3 class="text-base font-bold text-gray-900">Persiapan Hari-H</h3>
+                <p class="mb-4 text-xs text-gray-400">Hal yang perlu disiapkan sebelum bertanding</p>
+                <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                    @php $arrive = $start->copy()->subMinutes(15)->format('H:i'); @endphp
+                    @foreach([
+                        ['Bawa sepatu olahraga dan botol minum pribadi.', '👟'],
+                        ['Datang 15 menit lebih awal (' . $arrive . ' WIB) untuk pemanasan.', '⏱️'],
+                        ['Tunjukkan halaman ini ke penyelenggara di lokasi.', '🎟️'],
+                    ] as [$text, $emoji])
+                        <div class="flex items-start gap-3 rounded-xl bg-gray-50 p-4 text-sm text-gray-700">
+                            <span class="text-lg leading-none">{{ $emoji }}</span>
+                            <span>{{ $text }}</span>
+                        </div>
+                    @endforeach
+                </div>
+            </section>
+
+            <div class="mx-auto mt-6 grid max-w-3xl grid-cols-1 gap-3 sm:grid-cols-2">
+                <a href="{{ route('player.join.show', $event->slug) }}" class="inline-flex items-center justify-center gap-2 rounded-xl bg-brand-500 px-4 py-3.5 text-sm font-bold text-white shadow-lg shadow-brand-500/25 hover:bg-brand-600">
+                    Lihat Event & Roster
+                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
+                </a>
+                <a href="{{ $calendarUrl }}" target="_blank" rel="noopener" class="inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-3.5 text-sm font-bold text-gray-800 hover:bg-gray-50">
+                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                    Tambah ke Google Calendar
+                </a>
+                @if($whatsappShareUrl)
+                    <a href="{{ $whatsappShareUrl }}" target="_blank" rel="noopener" class="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-500 px-4 py-3.5 text-sm font-bold text-white hover:bg-emerald-600 sm:col-span-2">
+                        Simpan Tiket ke WhatsApp Saya
+                    </a>
+                @endif
+            </div>
+
+        @else
+            {{-- ═══ Menunggu pembayaran (bayar dulu / bayar menyusul) ═══ --}}
+            <div class="pro-card mb-6 flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
+                <div class="flex items-center gap-3">
+                    <span class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-brand-500 text-sm font-bold text-white">2</span>
+                    <div>
+                        <p class="text-[10px] font-bold uppercase tracking-wider text-brand-500">Langkah 2 dari 2</p>
+                        <p class="text-base font-bold text-gray-900">Pembayaran & Verifikasi QRIS</p>
+                    </div>
+                </div>
+                <div class="flex flex-wrap items-center gap-3">
+                    @if($isHold)
+                        <span class="inline-flex items-center gap-2 rounded-full bg-brand-900 px-4 py-2 text-xs font-bold text-lime-400">
+                            <span class="h-2 w-2 animate-pulse rounded-full bg-lime-400"></span>
+                            <span id="hold-label">Slot dikunci · sisa</span>
+                            <span id="hold-countdown"
+                                  data-expires-at="{{ \Carbon\Carbon::parse($latestJoin->pivot->payment_expires_at)->toIso8601String() }}"
+                                  data-release-at="{{ \App\Models\Event::holdReleaseAt($latestJoin->pivot->payment_expires_at)->toIso8601String() }}">--:--</span>
+                        </span>
+                    @endif
+                    @if($latestJoin && $status !== 'paid')
+                        <button type="button" id="btn-cancel-reg" class="inline-flex items-center gap-1.5 text-sm font-semibold text-gray-500 hover:text-rose-600">
+                            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                            Batalkan Pendaftaran
+                        </button>
                     @endif
                 </div>
-
-                @if($latestJoin->pivot->payment_method === 'online_banking' && $latestJoin->pivot->payment_status !== 'paid')
-                    <button id="midtrans-pay-button" type="button" class="mt-5 w-full py-3 rounded-xl bg-brand-500 hover:bg-brand-600 text-white font-bold text-sm transition-all shadow-lg shadow-brand-500/20 flex items-center justify-center gap-2">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
-                        Bayar via Midtrans
-                    </button>
-                @elseif($latestJoin->pivot->payment_method === 'tunai')
-                    <div class="mt-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700 flex items-start gap-2">
-                        <svg class="w-4 h-4 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                        Pembayaran dilakukan tunai langsung ke admin sebelum atau saat match dimulai.
-                    </div>
-                @endif
-            @endif
-
-            {{-- Back / Cancel --}}
-            <div class="mt-6 flex flex-col sm:flex-row sm:justify-center gap-3">
-                <a href="{{ route('player.join.show', $event->slug) }}"
-                    class="flex-1 inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
-                    Kembali ke Halaman Pendaftaran
-                </a>
-                @if($latestJoin && $latestJoin->pivot->payment_status !== 'paid')
-                    <button type="button" id="btn-cancel-reg"
-                        class="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-rose-500 px-4 py-3 text-sm font-semibold text-white hover:bg-rose-600 transition-colors">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-                        Batalkan Pendaftaran
-                    </button>
-                @endif
             </div>
+
+            <span class="inline-flex items-center gap-2 rounded-full bg-brand-50 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-brand-600">Pembayaran resmi via Midtrans</span>
+            <h1 class="mt-3 text-3xl sm:text-4xl font-bold text-gray-900">{{ $isHold ? 'Selesaikan Pembayaran' : 'Pendaftaran Tercatat' }}</h1>
+            <p class="mt-2 max-w-2xl text-sm text-gray-500">
+                @if($isHold)
+                    Slot Anda sedang ditahan. Bayar dengan QRIS sebelum waktu habis; Anda baru masuk roster setelah pembayaran berhasil.
+                @else
+                    Anda sudah masuk roster. Lunasi sebelum event dimulai lewat tombol di bawah atau link pelunasan yang dikirim ke WhatsApp Anda.
+                @endif
+            </p>
+
+            <div class="mt-6 grid grid-cols-1 gap-5 lg:grid-cols-2 lg:items-start">
+                {{-- QRIS --}}
+                <section class="pro-card p-5 sm:p-6">
+                    <div class="flex items-center justify-between gap-2 rounded-xl bg-gray-50 px-4 py-3">
+                        <span class="text-lg font-black tracking-tight text-rose-600">QRIS</span>
+                        <span class="text-[10px] font-bold uppercase tracking-wider text-brand-600">🔒 Dinamis · sekali pakai</span>
+                    </div>
+
+                    <div class="mt-5 rounded-2xl border border-gray-100 bg-gray-50/60 p-6 text-center">
+                        <p class="text-[10px] font-bold uppercase tracking-wider text-gray-400">Total yang harus dibayar</p>
+                        <p class="mt-1 text-4xl font-bold text-gray-900">{{ $rupiah($paymentAmount) }}</p>
+                        <p class="mt-1 text-xs font-semibold text-brand-500">Sudah termasuk biaya layanan</p>
+
+                        @if($isOnline && !$isCancelled)
+                            <button id="midtrans-pay-button" type="button" class="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-brand-500 py-3.5 text-sm font-bold text-white shadow-lg shadow-brand-500/25 transition-all hover:bg-brand-600 disabled:opacity-60">
+                                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"/></svg>
+                                Tampilkan QRIS & Bayar
+                            </button>
+                        @elseif($latestJoin && $latestJoin->pivot->payment_method === 'tunai')
+                            <p class="mt-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">Pembayaran dilakukan tunai langsung ke penyelenggara sebelum atau saat event dimulai.</p>
+                        @endif
+                    </div>
+
+                    <div class="mt-5 border-t border-gray-100 pt-4 text-center">
+                        <p class="text-[10px] font-bold uppercase tracking-wider text-brand-600">Bisa dibayar dengan aplikasi QRIS apa pun</p>
+                        <div class="mt-3 flex flex-wrap justify-center gap-2">
+                            @foreach(['GoPay', 'OVO', 'DANA', 'ShopeePay', 'BCA Mobile', "Livin' Mandiri"] as $app)
+                                <span class="rounded-md bg-gray-100 px-2.5 py-1 text-[11px] font-semibold text-gray-600">{{ $app }}</span>
+                            @endforeach
+                        </div>
+                    </div>
+
+                    <div class="mt-5 rounded-2xl bg-gray-50 p-5">
+                        <p class="text-sm font-bold text-gray-900">3 Langkah Bayar</p>
+                        <ol class="mt-3 space-y-3 text-sm text-gray-600">
+                            @foreach([
+                                'Klik <strong>Tampilkan QRIS & Bayar</strong>, lalu buka aplikasi e-wallet atau m-banking dan pilih <strong>Scan / QRIS</strong>.',
+                                'Pindai kode QR yang muncul, atau simpan gambarnya lalu unggah dari galeri.',
+                                'Pastikan nominal <strong>' . e($rupiah($paymentAmount)) . '</strong>, lalu konfirmasi dengan PIN Anda.',
+                            ] as $i => $stepText)
+                                <li class="flex gap-3">
+                                    <span class="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-brand-500 text-xs font-bold text-white">{{ $i + 1 }}</span>
+                                    <span>{!! $stepText !!}</span>
+                                </li>
+                            @endforeach
+                        </ol>
+                    </div>
+                </section>
+
+                {{-- Ringkasan & status --}}
+                <div class="space-y-4">
+                    <section class="pro-card p-5 sm:p-6">
+                        <div class="flex items-center justify-between gap-2 border-b border-gray-100 pb-3">
+                            <h2 class="text-base font-bold text-gray-900">Ringkasan Pendaftaran</h2>
+                            <span class="rounded-md bg-gray-100 px-2 py-0.5 font-mono text-[11px] font-bold text-gray-500">#{{ $registrationCode }}</span>
+                        </div>
+                        <div class="border-b border-gray-100 py-3">
+                            <p class="text-[10px] font-bold uppercase tracking-wider text-gray-400">Event</p>
+                            <p class="mt-0.5 text-sm font-bold text-gray-900">{{ $event->nama_event }}</p>
+                            <p class="text-xs text-gray-500">{{ $tanggalLabel }} · {{ $waktu }} WIB · {{ $event->tempat }}</p>
+                        </div>
+                        <dl class="divide-y divide-gray-100 text-sm">
+                            <div class="flex justify-between gap-3 py-3"><dt class="text-gray-500">Nama peserta</dt><dd class="text-right font-semibold text-gray-900">{{ $latestJoin?->nama ?? '-' }}</dd></div>
+                            <div class="flex justify-between gap-3 py-3"><dt class="text-gray-500">Posisi</dt><dd class="text-right font-semibold text-gray-900">{{ $roleName ?: 'Peserta' }}</dd></div>
+                            <div class="flex justify-between gap-3 py-3"><dt class="text-gray-500">Metode</dt><dd class="text-right font-semibold text-brand-600">{{ $isOnline ? 'QRIS (Midtrans)' : 'Tunai' }}</dd></div>
+                            <div class="flex items-end justify-between gap-3 py-3">
+                                <dt><span class="block font-bold text-gray-900">Total</span><span class="text-[11px] text-gray-400">Termasuk biaya layanan</span></dt>
+                                <dd class="text-2xl font-bold text-brand-600">{{ $rupiah($paymentAmount) }}</dd>
+                            </div>
+                        </dl>
+                    </section>
+
+                    @if($isOnline)
+                        <section class="rounded-2xl bg-brand-900 p-5 sm:p-6 text-white shadow-xl">
+                            <div class="flex items-start gap-3">
+                                <span class="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full border-2 border-lime-400 text-lime-400">
+                                    <svg class="h-5 w-5 animate-spin" style="animation-duration:3s" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                                </span>
+                                <div>
+                                    <span class="inline-flex items-center gap-1.5 rounded-full bg-lime-400 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-brand-900"><span class="h-1.5 w-1.5 rounded-full bg-brand-900"></span>Status dipantau otomatis</span>
+                                    <p class="mt-2 text-lg font-bold">{{ $status === 'failed' ? 'Pembayaran belum berhasil' : 'Menunggu pembayaran…' }}</p>
+                                </div>
+                            </div>
+                            <p class="mt-3 text-sm text-white/70">
+                                @if($status === 'failed')
+                                    Transaksi sebelumnya gagal atau kedaluwarsa. Silakan buat QRIS baru dan bayar ulang.
+                                @else
+                                    Halaman ini mengecek status pembayaran setiap beberapa detik dan akan berpindah otomatis setelah lunas.
+                                @endif
+                            </p>
+                            <div class="mt-4 grid grid-cols-1 gap-2 {{ app()->environment('local') ? 'sm:grid-cols-2' : '' }}">
+                                <button type="button" id="btn-check-status" class="inline-flex items-center justify-center gap-2 rounded-xl bg-white/10 px-4 py-2.5 text-sm font-bold hover:bg-white/20">Cek Status Sekarang</button>
+                                @if(app()->environment('local'))
+                                    {{-- Hanya muncul di lingkungan pengembangan --}}
+                                    <form method="POST" action="{{ route('registration.simulatePayment', $token) }}">
+                                        @csrf
+                                        <button type="submit" class="w-full rounded-xl bg-lime-400 px-4 py-2.5 text-sm font-bold text-brand-900 hover:bg-lime-500">Simulasi Lunas (dev)</button>
+                                    </form>
+                                @endif
+                            </div>
+                        </section>
+                    @endif
+
+                    <div class="flex items-start gap-3 rounded-xl bg-white p-4 text-xs text-gray-500 ring-1 ring-gray-200">
+                        <svg class="h-5 w-5 flex-shrink-0 text-brand-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+                        <span>Pembayaran diproses Midtrans dan terverifikasi otomatis. Simpan link halaman ini untuk melihat status pendaftaran kapan saja.</span>
+                    </div>
+                </div>
+            </div>
+        @endif
+    </main>
+
+    <footer class="mt-10 border-t border-gray-200 bg-white">
+        <div class="mx-auto flex max-w-5xl flex-col items-center justify-between gap-2 px-4 py-5 text-xs text-gray-400 sm:flex-row sm:px-6 lg:px-8">
+            <p><span class="font-bold text-brand-900">ATTURIN</span> · Manajemen event olahraga komunitas</p>
+            <p>© {{ now()->year }} {{ config('app.name', 'Atturin') }}</p>
         </div>
-    </div>
+    </footer>
+
+    <script>
+        document.querySelectorAll('.copy-btn').forEach((btn) => btn.addEventListener('click', async () => {
+            try {
+                await navigator.clipboard.writeText(btn.dataset.copy);
+                btn.textContent = 'Tersalin';
+                setTimeout(() => { btn.textContent = 'Salin'; }, 1500);
+            } catch (e) { /* clipboard tidak tersedia */ }
+        }));
+    </script>
 
     {{-- Cancel Confirmation Modal --}}
-    @if($latestJoin && $latestJoin->pivot->payment_status !== 'paid')
+    @if($latestJoin && $latestJoin->pivot->payment_status !== 'paid' && !$isCancelled)
     <div id="modal-cancel" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4">
         <div id="modal-backdrop" class="absolute inset-0 bg-black/40 backdrop-blur-sm"></div>
         <div class="relative bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 fade-up">
@@ -207,7 +382,7 @@
             </div>
             <h2 class="text-lg font-bold text-gray-900 text-center">Batalkan Pendaftaran?</h2>
             <p class="text-sm text-gray-500 text-center mt-2">
-                Data pendaftaran Anda akan <span class="font-semibold text-rose-500">dihapus</span> dan Anda perlu mendaftar ulang jika ingin bergabung kembali.
+                Data pendaftaran Anda akan <span class="font-semibold text-rose-500">dihapus</span> dan slot dilepas untuk peserta lain.
             </p>
             <div class="mt-6 flex gap-3">
                 <button type="button" id="btn-cancel-no"
@@ -242,7 +417,7 @@
     </script>
     @endif
 
-    @if($latestJoin && $latestJoin->pivot->payment_method === 'online_banking' && $latestJoin->pivot->payment_status !== 'paid')
+    @if($latestJoin && $latestJoin->pivot->payment_method === 'online_banking' && $latestJoin->pivot->payment_status !== 'paid' && !$isCancelled)
         <script>
             (function () {
                 const payButton = document.getElementById('midtrans-pay-button');
@@ -272,6 +447,10 @@
                         payButton.disabled = true;
 
                         const tokenResult = await postJson(tokenUrl, {});
+                        if (tokenResult.expired) {
+                            window.location.reload();
+                            return;
+                        }
                         if (!tokenResult.token) {
                             payButton.disabled = false;
                             alert(tokenResult.message || 'Gagal membuat token pembayaran.');
@@ -309,7 +488,7 @@
                     }
                     try {
                         const result = await postJson(statusUrl, {});
-                        if (result.status === 'paid') {
+                        if (result.status === 'paid' || result.status === 'expired') {
                             pollingActive = false;
                             return true;
                         }
@@ -327,6 +506,19 @@
 
                 redirectIfPaid();
 
+                const checkBtn = document.getElementById('btn-check-status');
+                if (checkBtn) {
+                    checkBtn.addEventListener('click', async () => {
+                        checkBtn.disabled = true;
+                        checkBtn.textContent = 'Memeriksa…';
+                        pollingActive = true;
+                        const done = await checkPaymentStatus();
+                        if (done) { window.location.reload(); return; }
+                        checkBtn.textContent = 'Belum ada pembayaran masuk';
+                        setTimeout(() => { checkBtn.disabled = false; checkBtn.textContent = 'Cek Status Sekarang'; }, 2500);
+                    });
+                }
+
                 window.addEventListener('focus', redirectIfPaid);
                 const pollInterval = setInterval(redirectIfPaid, 5000);
 
@@ -334,6 +526,31 @@
                     pollingActive = false;
                     clearInterval(pollInterval);
                 });
+
+                // Mode bayar dulu: hitung mundur masa tahan slot & buka QRIS otomatis
+                const holdEl = document.getElementById('hold-countdown');
+                if (holdEl) {
+                    const deadline = new Date(holdEl.dataset.expiresAt).getTime();
+                    const releaseAt = new Date(holdEl.dataset.releaseAt).getTime();
+                    const tick = () => {
+                        const left = Math.max(0, Math.floor((deadline - Date.now()) / 1000));
+                        holdEl.textContent = String(Math.floor(left / 60)).padStart(2, '0') + ':' + String(left % 60).padStart(2, '0');
+                        if (left <= 0) {
+                            clearInterval(timer);
+                            // Waktu bayar habis: polling tetap jalan untuk menangkap pembayaran detik terakhir,
+                            // halaman dimuat ulang setelah slot benar-benar dilepas.
+                            document.getElementById('hold-label').textContent = 'Waktu habis · memeriksa pembayaran…';
+                            holdEl.textContent = '';
+                            if (payButton) payButton.classList.add('hidden');
+                            setTimeout(() => window.location.reload(), Math.max(0, releaseAt - Date.now()) + 3000);
+                        }
+                    };
+                    const timer = setInterval(tick, 1000);
+                    tick();
+                    if (payButton && deadline > Date.now()) {
+                        payButton.click();
+                    }
+                }
             })();
         </script>
     @endif

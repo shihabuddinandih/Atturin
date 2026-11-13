@@ -28,6 +28,7 @@ class EventService
                 \Illuminate\Support\Facades\DB::raw(
                     "CASE
                         WHEN event_player.payment_method != 'online_banking' THEN event_player.payment_amount
+                        WHEN event_player.payment_amount <= 0                   THEN 0
                         WHEN event_player.payment_amount <= 50500               THEN event_player.payment_amount - 1500
                         WHEN event_player.payment_amount <= 102000              THEN event_player.payment_amount - 3000
                         ELSE                                                         event_player.payment_amount / 1.03
@@ -106,7 +107,9 @@ class EventService
     public function buildLivePayload(Event $event): array
     {
         $event->load(['players' => function ($query) {
-            $query->orderBy('event_player.created_at', 'asc');
+            // Peserta yang masih menahan slot (mode bayar dulu) belum dianggap terdaftar
+            $query->wherePivotNotIn('status_join', [JoinStatus::HOLD->value])
+                ->orderBy('event_player.created_at', 'asc');
         }]);
 
         $contactRequests = PlayerContactRequest::where('event_id', $event->id)
@@ -145,6 +148,7 @@ class EventService
             if ($player['payment_method'] !== 'online_banking') {
                 return $amt;
             }
+            if ($amt <= 0)      return 0.0;
             if ($amt <= 50500)  return $amt - 1500;
             if ($amt <= 102000) return $amt - 3000;
             return $amt / 1.03;

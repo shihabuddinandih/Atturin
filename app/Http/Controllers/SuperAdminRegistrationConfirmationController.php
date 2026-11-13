@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Jobs\SendWaitlistOfferJob;
 use App\Models\Event;
 use App\Models\Player;
 
@@ -11,10 +12,12 @@ class SuperAdminRegistrationConfirmationController extends Controller
     {
         $events = Event::with(['players' => function ($query) {
             $query->wherePivotNull('confirmation_sent_at')
+                ->wherePivot('status_join', 'joined')
                 ->orderBy('event_player.created_at', 'asc');
         }])
             ->whereHas('players', function ($query) {
-                $query->whereNull('event_player.confirmation_sent_at');
+                $query->whereNull('event_player.confirmation_sent_at')
+                    ->where('event_player.status_join', 'joined');
             })
             ->orderByDesc('tanggal')
             ->orderByDesc('created_at')
@@ -49,6 +52,40 @@ class SuperAdminRegistrationConfirmationController extends Controller
         $whatsappUrl = 'https://wa.me/' . $phoneNumber . '?text=' . urlencode($message);
 
         return redirect()->away($whatsappUrl)->with('success', 'Pesan konfirmasi pendaftaran telah disiapkan dan dibuka di WhatsApp.');
+    }
+
+    /**
+     * Nomor WhatsApp peserta tidak valid → pendaftaran digugurkan dan slot dilepas.
+     * Peserta yang sudah lunas tidak bisa digugurkan dari sini.
+     */
+    public function invalidate(Event $event, Player $player)
+    {
+        $registration = $event->players()->where('players.id', $player->id)->first();
+        if (!$registration) {
+            return back()->with('error', 'Pemain tidak terdaftar pada event ini.');
+        }
+
+        if ($registration->pivot->payment_status === 'paid') {
+            return back()->with('error', 'Peserta ini sudah lunas, pendaftaran tidak digugurkan.');
+        }
+
+        $wasJoined = $registration->pivot->status_join === 'joined';
+
+        $event->players()->updateExistingPivot($player->id, [
+            'status_join' => 'batal',
+            'payment_status' => 'failed',
+            'payment_snap_token' => null,
+            'confirmation_sent_at' => now(),
+        ]);
+
+        if ($wasJoined && $event->enable_waiting_list) {
+            $next = $event->waitlists()->where('status', 'waiting')->oldest()->first();
+            if ($next) {
+                SendWaitlistOfferJob::dispatch($next);
+            }
+        }
+
+        return back()->with('success', "Pendaftaran {$player->nama} digugurkan karena nomor WhatsApp tidak valid. Slot sudah dilepas.");
     }
 
     protected function normalizePhoneNumber(?string $phone): ?string

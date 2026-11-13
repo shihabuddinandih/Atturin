@@ -36,6 +36,42 @@
         </div>
     </div>
 
+    {{-- Draf event (belum dipublikasikan, tidak punya link join) --}}
+    @if($drafts->isNotEmpty())
+        <div class="pro-card p-4 sm:p-5">
+            <div class="flex items-center justify-between gap-3 mb-3">
+                <div class="flex items-center gap-2">
+                    <span class="inline-flex items-center rounded-md bg-amber-50 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider text-amber-700">Draf</span>
+                    <p class="text-sm font-semibold text-gray-900">Event belum dipublikasikan</p>
+                </div>
+                <span class="text-xs text-gray-400">{{ $drafts->count() }} draf</span>
+            </div>
+            <div class="divide-y divide-gray-100">
+                @foreach($drafts as $draft)
+                    <div class="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between">
+                        <div class="min-w-0">
+                            <p class="truncate text-sm font-semibold text-gray-800">{{ $draft->nama_event ?: 'Tanpa judul' }}</p>
+                            <p class="text-xs text-gray-400">
+                                @if(!empty($draft->payload['tanggal']))
+                                    {{ \Illuminate\Support\Carbon::parse($draft->payload['tanggal'])->translatedFormat('d M Y') }} ·
+                                @endif
+                                Disimpan {{ $draft->updated_at->diffForHumans() }}
+                            </p>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <a href="{{ route('admin.events.create', ['draft' => $draft->id]) }}" class="inline-flex flex-1 sm:flex-none justify-center items-center rounded-lg bg-brand-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-brand-600">Lanjutkan</a>
+                            <form action="{{ route('admin.events.drafts.destroy', $draft) }}" method="POST" class="flex-1 sm:flex-none" onsubmit="return confirm('Hapus draf ini?')">
+                                @csrf
+                                @method('DELETE')
+                                <button type="submit" class="w-full rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-100">Hapus</button>
+                            </form>
+                        </div>
+                    </div>
+                @endforeach
+            </div>
+        </div>
+    @endif
+
     {{-- 2. Filter Navigation & Search --}}
     <div class="flex flex-wrap items-center justify-between gap-4">
         <div class="flex max-w-full items-center gap-1.5 overflow-x-auto p-1 bg-gray-100 rounded-xl">

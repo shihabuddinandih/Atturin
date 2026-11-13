@@ -155,10 +155,21 @@
                                     • Nominal: Rp {{ number_format($player->pivot->payment_amount ?? 0, 0, ',', '.') }}
                                 </p>
                             </div>
-                            <a href="{{ route('superadmin.registration-confirmations.send', ['event' => $event, 'player' => $player]) }}"
-                               class="inline-flex items-center justify-center rounded-xl bg-green-600 hover:bg-green-700 text-white font-semibold px-4 py-2.5 text-sm shadow-sm">
-                                Kirim Konfirmasi via WhatsApp
-                            </a>
+                            <div class="flex flex-col sm:flex-row gap-2">
+                                <a href="{{ route('superadmin.registration-confirmations.send', ['event' => $event, 'player' => $player]) }}"
+                                   class="inline-flex items-center justify-center rounded-xl bg-green-600 hover:bg-green-700 text-white font-semibold px-4 py-2.5 text-sm shadow-sm">
+                                    Kirim Link Pelunasan via WhatsApp
+                                </a>
+                                @if($player->pivot->payment_status !== 'paid')
+                                    <form method="POST" action="{{ route('superadmin.registration-confirmations.invalidate', ['event' => $event, 'player' => $player]) }}"
+                                          onsubmit="return confirm({{ \Illuminate\Support\Js::from('Gugurkan pendaftaran ' . ($player->nama ?? 'peserta') . '? Slot akan dilepas untuk peserta lain.') }})">
+                                        @csrf
+                                        <button type="submit" class="w-full inline-flex items-center justify-center rounded-xl border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 font-semibold px-4 py-2.5 text-sm">
+                                            Nomor Tidak Valid
+                                        </button>
+                                    </form>
+                                @endif
+                            </div>
                         </div>
                     @empty
                         <div class="px-6 py-8 text-center text-sm text-slate-500">

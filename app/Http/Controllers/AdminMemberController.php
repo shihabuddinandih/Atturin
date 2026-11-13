@@ -31,6 +31,7 @@ class AdminMemberController extends Controller
                 DB::raw("SUM(CASE WHEN mp.payment_status = '" . PaymentStatus::PAID->value . "' THEN
                     CASE
                         WHEN mp.payment_method != 'online_banking' THEN mp.payment_amount
+                        WHEN mp.payment_amount <= 0                 THEN 0
                         WHEN mp.payment_amount <= 50500             THEN mp.payment_amount - 1500
                         WHEN mp.payment_amount <= 102000            THEN mp.payment_amount - 3000
                         ELSE                                             mp.payment_amount / 1.03
@@ -75,6 +76,7 @@ class AdminMemberController extends Controller
                 DB::raw("SUM(CASE WHEN mp.payment_status = '" . PaymentStatus::PAID->value . "' THEN
                     CASE
                         WHEN mp.payment_method != 'online_banking' THEN mp.payment_amount
+                        WHEN mp.payment_amount <= 0                 THEN 0
                         WHEN mp.payment_amount <= 50500             THEN mp.payment_amount - 1500
                         WHEN mp.payment_amount <= 102000            THEN mp.payment_amount - 3000
                         ELSE                                             mp.payment_amount / 1.03

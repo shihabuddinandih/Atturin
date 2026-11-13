@@ -12,6 +12,7 @@ class VerifyCsrfToken extends Middleware
      * @var array<int, string>
      */
     protected $except = [
-        //
+        // Dipanggil server Midtrans (bukan browser); keamanan lewat verifikasi signature_key
+        'midtrans/notification',
     ];
 }

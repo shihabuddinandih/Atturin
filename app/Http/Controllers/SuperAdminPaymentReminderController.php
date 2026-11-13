@@ -15,10 +15,12 @@ class SuperAdminPaymentReminderController extends Controller
     {
         $events = Event::with(['players' => function ($query) {
             $query->wherePivot('payment_status', 'pending')
+                ->wherePivot('status_join', 'joined')
                 ->orderBy('event_player.created_at', 'asc');
         }])
             ->whereHas('players', function ($query) {
-                $query->where('event_player.payment_status', 'pending');
+                $query->where('event_player.payment_status', 'pending')
+                    ->where('event_player.status_join', 'joined');
             })
             ->orderByDesc('tanggal')
             ->orderByDesc('created_at')

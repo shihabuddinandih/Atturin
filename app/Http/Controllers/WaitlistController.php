@@ -34,8 +34,16 @@ class WaitlistController extends Controller
         $response = null;
 
         DB::transaction(function () use ($entry, $event, &$accepted, &$response) {
-            $joined = $event->players()->wherePivot('status_join', 'joined')->count();
+            \App\Models\Event::whereKey($event->id)->lockForUpdate()->first();
+            $joined = $event->occupiedSlotCount();
             if ($joined < $event->slot_max) {
+                // Nominal dihitung ulang dari harga posisi yang dipilih saat masuk antrean (+ biaya admin).
+                // Tidak memakai event_waitlists.payment_amount karena baris lama bernilai default 0.
+                $role = $entry->role_name ? collect($event->roles ?? [])->firstWhere('name', $entry->role_name) : null;
+                $basePrice = $role ? (float) ($role['price'] ?? 0) : (float) $event->iuran_per_pemain;
+                $amount = \App\Support\PaymentFee::total($basePrice, $event->metode_pembayaran);
+                $isFree = $amount <= 0;
+                $payFirst = $event->requiresPaymentFirst() && !$isFree;
                 $player = $entry->player;
                 if (!$player) {
                     // Create a minimal player record using phone
@@ -48,14 +56,15 @@ class WaitlistController extends Controller
                 $existingRegistration = $event->players()->where('players.id', $player->id)->first();
 
                 $payload = [
-                    'status_join' => 'joined',
+                    'status_join' => $payFirst ? 'hold' : 'joined',
                     'hadir' => false,
                     'payment_method' => $event->metode_pembayaran,
-                    'payment_amount' => $event->iuran_per_pemain,
-                    'payment_status' => 'pending',
-                    'payment_reference' => null,
-                    'payment_paid_at' => null,
-                    'payment_expires_at' => null,
+                    'payment_amount' => $amount,
+                    'role_name' => $entry->role_name,
+                    'payment_status' => $isFree ? 'paid' : 'pending',
+                    'payment_reference' => $isFree ? 'GRATIS-' . strtoupper(Str::random(8)) : null,
+                    'payment_paid_at' => $isFree ? now() : null,
+                    'payment_expires_at' => $payFirst ? now()->addMinutes(\App\Models\Event::HOLD_MINUTES) : null,
                     'payment_snap_token' => null,
                     'registration_token' => $existingRegistration && $existingRegistration->pivot->registration_token
                         ? $existingRegistration->pivot->registration_token
@@ -77,7 +86,9 @@ class WaitlistController extends Controller
                 ];
                 session(['join_context' => $joinContext]);
 
-                SendRegistrationConfirmationJob::dispatch($event->id, $player->id, $payload['registration_token']);
+                if (!$payFirst && !$isFree) {
+                    SendRegistrationConfirmationJob::dispatch($event->id, $player->id, $payload['registration_token']);
+                }
 
                 $pendingCookieName = 'pending_payment_' . $event->id;
                 $response = redirect()->route('registration.show', $payload['registration_token'])

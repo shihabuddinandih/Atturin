@@ -63,6 +63,8 @@ class RegistrationController extends Controller
 
                         if ($newStatus === 'paid') {
                             $payload['status_join'] = 'joined';
+                        } elseif ($newStatus === 'failed' && $player->pivot->status_join === 'hold') {
+                            $payload['status_join'] = 'batal';
                         }
 
                         $event->players()->updateExistingPivot($player->id, $payload);
@@ -74,6 +76,8 @@ class RegistrationController extends Controller
                 }
             }
         }
+
+        $player = $this->releaseExpiredHold($event, $player);
 
         $latestJoin = $player;
         $whatsappShareUrl = $this->buildWhatsAppShareUrl($player, $event, route('registration.show', $token));
@@ -93,6 +97,18 @@ class RegistrationController extends Controller
             return response()->json(['message' => 'Pembayaran sudah tercatat.'], 200);
         }
 
+        $player = $this->releaseExpiredHold($event, $player);
+        if ($player->pivot->status_join === 'batal') {
+            return response()->json(['message' => 'Waktu pembayaran habis dan slot sudah dilepas. Silakan daftar ulang.', 'expired' => true], 410);
+        }
+
+        // Masa tahan habis tapi masih dalam jeda verifikasi: jangan buat QR baru
+        if ($player->pivot->status_join === 'hold'
+            && $player->pivot->payment_expires_at
+            && Carbon::parse($player->pivot->payment_expires_at)->isPast()) {
+            return response()->json(['message' => 'Waktu pembayaran sudah habis. Jika Anda sudah membayar, status akan diperbarui otomatis dalam beberapa saat.'], 409);
+        }
+
         $serverKey = config('services.midtrans.server_key');
         $clientKey = config('services.midtrans.client_key');
         if (!$serverKey || !$clientKey) {
@@ -110,6 +126,13 @@ class RegistrationController extends Controller
 
         if ($player->pivot->payment_status === 'pending' && $existingRef && $existingToken && $expiresAt && $expiresAt->greaterThan(now())) {
             return response()->json(['token' => $existingToken]);
+        }
+
+        // Mode bayar dulu: QRIS tidak boleh berlaku lebih lama dari sisa masa tahan slot.
+        $isHold = $player->pivot->status_join === 'hold';
+        $durationMinutes = Event::HOLD_MINUTES;
+        if ($isHold && $expiresAt) {
+            $durationMinutes = (int) max(1, min(Event::HOLD_MINUTES, ceil(now()->diffInSeconds($expiresAt, false) / 60)));
         }
 
         $orderId = 'PSH-' . now()->format('YmdHis') . '-' . strtoupper(Str::random(6));
@@ -136,7 +159,7 @@ class RegistrationController extends Controller
             'expiry' => [
                 'start_time' => now()->format('Y-m-d H:i:s O'),
                 'unit' => 'minute',
-                'duration' => 3,
+                'duration' => $durationMinutes,
             ],
         ];
 
@@ -145,7 +168,8 @@ class RegistrationController extends Controller
         $event->players()->updateExistingPivot($player->id, [
             'payment_reference' => $orderId,
             'payment_status' => 'pending',
-            'payment_expires_at' => now()->addMinutes(3),
+            // Masa tahan slot tidak diperpanjang saat membuat QR baru
+            'payment_expires_at' => $isHold ? $expiresAt : now()->addMinutes(Event::HOLD_MINUTES),
             'payment_snap_token' => $snapToken,
         ]);
 
@@ -154,51 +178,8 @@ class RegistrationController extends Controller
 
     public function midtransFinish(Request $request, string $token)
     {
-        [$event, $player] = $this->resolveOrFail($token);
-
-        $transactionStatus = (string) $request->input('transaction_status', 'pending');
-        $orderId = $request->input('order_id', $player->pivot->payment_reference);
-
-        $newStatus = match ($transactionStatus) {
-            'capture', 'settlement' => 'paid',
-            'deny', 'cancel', 'expire' => 'failed',
-            default => 'pending',
-        };
-
-        $updatePayload = [
-            'payment_status' => $newStatus,
-            'payment_reference' => $orderId,
-            'payment_paid_at' => $newStatus === 'paid' ? now() : null,
-            'payment_expires_at' => $newStatus === 'paid' ? null : $player->pivot->payment_expires_at,
-            'payment_snap_token' => $newStatus === 'paid' ? null : $player->pivot->payment_snap_token,
-        ];
-
-        if ($newStatus === 'paid') {
-            $updatePayload['status_join'] = 'joined';
-        }
-
-        $targetPlayer = $player;
-        if ($player->pivot->payment_reference !== $orderId) {
-            $found = $event->players()->wherePivot('payment_reference', $orderId)->first();
-            if ($found) {
-                $targetPlayer = $found;
-            }
-        }
-
-        if (!$targetPlayer) {
-            return response()->json(['message' => 'Pemain untuk order ini tidak ditemukan.'], 404);
-        }
-
-        $event->players()->updateExistingPivot($targetPlayer->id, $updatePayload);
-
-        $response = response()->json(['status' => $newStatus]);
-
-        if ($newStatus === 'paid') {
-            session()->flash('success', 'Pembayaran berhasil! Anda telah bergabung dalam event.');
-            $response->withCookie(cookie()->forget('pending_payment_' . $event->id));
-        }
-
-        return $response;
+        // Status dari browser (callback Snap) tidak dipercaya: selalu cek langsung ke Midtrans.
+        return $this->midtransStatus($request, $token);
     }
 
     public function midtransStatus(Request $request, string $token)
@@ -251,9 +232,18 @@ class RegistrationController extends Controller
 
         if ($newStatus === 'paid') {
             $payload['status_join'] = 'joined';
+        } elseif ($newStatus === 'failed' && $player->pivot->status_join === 'hold') {
+            $payload['status_join'] = 'batal';
         }
 
         $event->players()->updateExistingPivot($player->id, $payload);
+
+        if ($newStatus === 'pending') {
+            $player = $this->releaseExpiredHold($event, $event->players()->where('players.id', $player->id)->first());
+            if ($player->pivot->status_join === 'batal') {
+                return response()->json(['status' => 'expired', 'transaction_status' => $transactionStatus]);
+            }
+        }
 
         $response = response()->json(['status' => $newStatus, 'transaction_status' => $transactionStatus]);
         if ($newStatus === 'paid') {
@@ -266,6 +256,9 @@ class RegistrationController extends Controller
 
     public function simulatePayment(Request $request, string $token)
     {
+        // Hanya untuk pengembangan: di production endpoint ini akan menandai lunas tanpa membayar.
+        abort_unless(app()->environment(['local', 'testing']), 404);
+
         [$event, $player] = $this->resolveOrFail($token);
 
         if ($player->pivot->payment_method !== 'online_banking') {
@@ -275,6 +268,11 @@ class RegistrationController extends Controller
         if ($player->pivot->payment_status === 'paid') {
             return back()->with('success', 'Pembayaran Anda sudah tercatat sebagai PAID.')
                 ->withCookie(cookie()->forget('pending_payment_' . $event->id));
+        }
+
+        $player = $this->releaseExpiredHold($event, $player);
+        if ($player->pivot->status_join === 'batal') {
+            return back()->with('error', 'Waktu pembayaran habis dan slot sudah dilepas. Silakan daftar ulang.');
         }
 
         $reference = 'SIM-MIDTRANS-' . strtoupper(Str::random(10));
@@ -310,6 +308,39 @@ class RegistrationController extends Controller
         return redirect()->route('player.join.show', $event->slug)
             ->with('info', 'Pendaftaran berhasil dibatalkan. Anda dapat mendaftar ulang kapan saja.')
             ->withCookie(cookie()->forget('pending_payment_' . $event->id));
+    }
+
+    /**
+     * Mode bayar dulu: jika masa tahan slot habis dan belum lunas, batalkan pendaftaran agar slot kembali tersedia.
+     */
+    protected function releaseExpiredHold(Event $event, Player $player): Player
+    {
+        $pivot = $player->pivot;
+
+        if ($pivot->status_join !== 'hold' || $pivot->payment_status === 'paid') {
+            return $player;
+        }
+
+        // Slot baru dilepas setelah masa tahan + jeda verifikasi pembayaran
+        $releaseAt = Event::holdReleaseAt($pivot->payment_expires_at);
+        if ($releaseAt && $releaseAt->isFuture()) {
+            return $player;
+        }
+
+        $event->players()->updateExistingPivot($player->id, [
+            'status_join' => 'batal',
+            'payment_status' => 'failed',
+            'payment_snap_token' => null,
+        ]);
+
+        if ($event->enable_waiting_list) {
+            $next = $event->waitlists()->where('status', 'waiting')->oldest()->first();
+            if ($next) {
+                SendWaitlistOfferJob::dispatch($next);
+            }
+        }
+
+        return $event->players()->where('players.id', $player->id)->first();
     }
 
     protected function buildWhatsAppShareUrl(Player $player, Event $event, string $registrationUrl): ?string

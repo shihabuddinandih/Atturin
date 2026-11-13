@@ -6,10 +6,12 @@ use App\Enums\JoinStatus;
 use App\Enums\PaymentStatus;
 use App\Jobs\SendWaitlistOfferJob;
 use App\Models\Event;
+use App\Models\EventDraft;
 use App\Models\PlayerContactRequest;
 use App\Services\EventService;
 use App\Support\FacilityCatalog;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 class AdminEventController extends Controller
@@ -25,18 +27,36 @@ class AdminEventController extends Controller
         
         $events = $this->eventService->getAdminEvents($adminId, $status);
         $summary = $this->eventService->getEventsSummary($adminId);
+        $drafts = EventDraft::ownedBy($adminId)->latest('updated_at')->get();
 
-        return view('admin.events.index', compact('events', 'summary', 'status'));
+        return view('admin.events.index', compact('events', 'summary', 'status', 'drafts'));
     }
 
-    public function create()
+    public function create(Request $request)
     {
-        return view('admin.events.create');
+        $draft = null;
+
+        if ($request->filled('draft')) {
+            $draft = EventDraft::ownedBy(auth()->id())->find($request->integer('draft'));
+
+            if (!$draft) {
+                return redirect()->route('admin.events.create')->with('error', 'Draf tidak ditemukan atau sudah dipublikasikan.');
+            }
+        }
+
+        $draftState = $draft?->toFormState();
+
+        return view('admin.events.create', compact('draftState'));
     }
 
     public function store(Request $request)
     {
         $request->merge(['skema_iuran' => 'custom']);
+
+        $draft = null;
+        if ($request->filled('draft_id')) {
+            $draft = EventDraft::ownedBy(auth()->id())->find($request->integer('draft_id'));
+        }
 
         $validated = $request->validate([
             'nama_event' => 'required|string|max:255',
@@ -44,6 +64,7 @@ class AdminEventController extends Controller
             'waktu' => 'required',
             'tempat' => 'required|string|max:255',
             'metode_pembayaran' => 'required|in:online_banking',
+            'payment_mode' => 'nullable|in:' . Event::PAYMENT_MODE_PAY_LATER . ',' . Event::PAYMENT_MODE_PAY_FIRST,
             'skema_iuran' => 'required|in:custom',
             'roles' => 'required|array|min:1',
             'roles.*.name' => 'required|string|max:255',
@@ -61,8 +82,16 @@ class AdminEventController extends Controller
         if ($request->hasFile('banner_image')) {
             $path = $request->file('banner_image')->store('banners', 'public');
             $validated['banner_image'] = $path;
+        } elseif ($draft?->banner_image && Storage::disk('public')->exists($draft->banner_image)) {
+            // Pakai banner yang sudah diunggah saat draf; pindahkan agar tidak ikut terhapus bersama draf.
+            $path = 'banners/' . basename($draft->banner_image);
+            Storage::disk('public')->move($draft->banner_image, $path);
+            $draft->banner_image = null;
+            $validated['banner_image'] = $path;
         }
 
+        $validated['payment_mode'] = $validated['payment_mode'] ?? Event::PAYMENT_MODE_PAY_LATER;
+        $validated['enable_waiting_list'] = $request->boolean('enable_waiting_list');
         $validated['show_joined_players_public'] = $request->boolean('show_joined_players_public', true);
         $validated['show_joined_player_contacts_public'] = $request->boolean('show_joined_player_contacts_public');
 
@@ -100,6 +129,8 @@ class AdminEventController extends Controller
             : 0;
 
         Event::create($validated);
+
+        $draft?->delete();
 
         return redirect()->route('admin.events.index')->with('success', 'Event berhasil dibuat.');
     }
@@ -183,7 +214,7 @@ class AdminEventController extends Controller
         $this->authorize('update', $event);
 
         $validated = $request->validate([
-            'status_join' => 'required|in:' . implode(',', array_column(JoinStatus::cases(), 'value'))
+            'status_join' => 'required|in:' . implode(',', JoinStatus::adminSettable())
         ]);
 
         $player = $event->players()->where('players.id', $playerId)->first();

@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AdminDashboardController;
 use App\Http\Controllers\AdminEventController;
+use App\Http\Controllers\AdminEventDraftController;
 use App\Http\Controllers\AdminEventTeamDrawController;
 use App\Http\Controllers\EventTeamPublicController;
 use App\Http\Controllers\AdminFinanceController;
@@ -40,6 +41,11 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::patch('settings', [AdminSettingsController::class, 'update'])->name('settings.update');
         Route::view('notifications', 'admin.notifications.index')->name('notifications.index');
         Route::view('faq', 'admin.faq.index')->name('faq.index');
+
+        // Draf event (auto-save wizard "Buat Event Baru") — harus sebelum resource agar tidak bentrok dengan events/{event}
+        Route::post('events/drafts', [AdminEventDraftController::class, 'store'])->name('events.drafts.store');
+        Route::post('events/drafts/{draft}', [AdminEventDraftController::class, 'update'])->name('events.drafts.update');
+        Route::delete('events/drafts/{draft}', [AdminEventDraftController::class, 'destroy'])->name('events.drafts.destroy');
 
         // Events (resource + custom actions)
         Route::resource('events', AdminEventController::class);
@@ -83,6 +89,7 @@ Route::middleware(['auth', 'superadmin'])->prefix('superadmin')->name('superadmi
 
     Route::get('registration-confirmations', [\App\Http\Controllers\SuperAdminRegistrationConfirmationController::class, 'index'])->name('registration-confirmations.index');
     Route::get('registration-confirmations/{event}/{player}/send', [\App\Http\Controllers\SuperAdminRegistrationConfirmationController::class, 'send'])->name('registration-confirmations.send');
+    Route::post('registration-confirmations/{event}/{player}/invalidate', [\App\Http\Controllers\SuperAdminRegistrationConfirmationController::class, 'invalidate'])->name('registration-confirmations.invalidate');
 
     Route::get('player-contact-requests', [SuperAdminPlayerContactRequestController::class, 'index'])->name('player-contact-requests.index');
     Route::get('player-contact-requests/{contactRequest}/send', [SuperAdminPlayerContactRequestController::class, 'send'])->name('player-contact-requests.send');
@@ -103,6 +110,10 @@ Route::get('/waitlist/claim/{token}', [\App\Http\Controllers\WaitlistController:
 
 // Durable, device-independent registration link (shareable via WhatsApp)
 Route::get('/r/{token}', [RegistrationController::class, 'show'])->name('registration.show');
+// Webhook Midtrans (HTTP Notification) — daftarkan di Dashboard Midtrans
+Route::post('/midtrans/notification', \App\Http\Controllers\MidtransNotificationController::class)
+    ->middleware('throttle:120,1')->name('midtrans.notification');
+
 Route::post('/r/{token}/midtrans/token', [RegistrationController::class, 'midtransToken'])->name('registration.midtrans.token');
 Route::post('/r/{token}/midtrans/finish', [RegistrationController::class, 'midtransFinish'])->name('registration.midtrans.finish');
 Route::post('/r/{token}/midtrans/status', [RegistrationController::class, 'midtransStatus'])->name('registration.midtrans.status');

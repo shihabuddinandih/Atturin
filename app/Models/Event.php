@@ -2,7 +2,9 @@
 
 namespace App\Models;
 
+use App\Enums\JoinStatus;
 use App\Enums\PaymentMethod;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -11,6 +13,26 @@ use Illuminate\Support\Str;
 class Event extends Model
 {
     use HasFactory, SoftDeletes;
+
+    public const PAYMENT_MODE_PAY_LATER = 'pay_later';
+    public const PAYMENT_MODE_PAY_FIRST = 'pay_first';
+
+    /** Lama slot ditahan (sekaligus masa berlaku QRIS) untuk mode bayar dulu. */
+    public const HOLD_MINUTES = 3;
+
+    /**
+     * Setelah waktu tahan habis, slot masih dicadangkan sebentar agar pembayaran QRIS di detik
+     * terakhir (QR dibulatkan per menit + jeda settlement) tidak bentrok dengan pendaftar baru.
+     */
+    public const HOLD_GRACE_SECONDS = 120;
+
+    /**
+     * Batas waktu sebelum slot hold benar-benar dilepas.
+     */
+    public static function holdReleaseAt($expiresAt): ?\Carbon\Carbon
+    {
+        return $expiresAt ? \Carbon\Carbon::parse($expiresAt)->addSeconds(self::HOLD_GRACE_SECONDS) : null;
+    }
 
     protected $table = 'events';
 
@@ -22,6 +44,7 @@ class Event extends Model
         'tempat',
         'slot_max',
         'metode_pembayaran',
+        'payment_mode',
         'iuran_per_pemain',
         'biaya_total_event',
         'facilities',
@@ -170,5 +193,47 @@ class Event extends Model
             ->count();
 
         return $joinedCount >= $this->slot_max;
+    }
+
+    public function requiresPaymentFirst(): bool
+    {
+        return $this->payment_mode === self::PAYMENT_MODE_PAY_FIRST;
+    }
+
+    /**
+     * Jumlah slot terpakai: peserta joined + peserta "hold" yang masa tahannya belum habis.
+     * Dipakai untuk cek kapasitas; roster & statistik tetap hanya menghitung joined.
+     */
+    public function occupiedSlotCount(?string $roleName = null): int
+    {
+        return $this->occupiedSlotsQuery()
+            ->when($roleName !== null, fn ($q) => $q->where('event_player.role_name', $roleName))
+            ->count();
+    }
+
+    /**
+     * @return array<string, int> jumlah slot terpakai per role_name
+     */
+    public function occupiedSlotCountsByRole(): array
+    {
+        return $this->occupiedSlotsQuery()
+            ->selectRaw("COALESCE(event_player.role_name, 'Tanpa Role') as role_key, COUNT(*) as total")
+            ->groupBy('role_key')
+            ->pluck('total', 'role_key')
+            ->map(fn ($v) => (int) $v)
+            ->all();
+    }
+
+    private function occupiedSlotsQuery()
+    {
+        return DB::table('event_player')
+            ->where('event_player.event_id', $this->id)
+            ->where(function ($q) {
+                $q->where('event_player.status_join', JoinStatus::JOINED->value)
+                    ->orWhere(function ($hold) {
+                        $hold->where('event_player.status_join', JoinStatus::HOLD->value)
+                            ->where('event_player.payment_expires_at', '>', now()->subSeconds(self::HOLD_GRACE_SECONDS));
+                    });
+            });
     }
 }

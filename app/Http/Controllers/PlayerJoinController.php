@@ -6,6 +6,7 @@ use App\Models\Event;
 use App\Models\Player;
 use App\Models\EventWaitlist;
 use App\Jobs\SendWaitlistOfferJob;
+use App\Support\PaymentFee;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -30,13 +31,15 @@ class PlayerJoinController extends Controller
             && (int) $pendingJoin['event_id'] === (int) $event->id
         ) {
             $pendingPlayer = $event->players()->where('players.id', $pendingJoin['player_id'])->first();
-            if ($pendingPlayer && $pendingPlayer->pivot->payment_status !== 'paid') {
+            if ($pendingPlayer && $pendingPlayer->pivot->payment_status !== 'paid' && $this->isActiveRegistration($pendingPlayer)) {
                 $pendingJoinPlayer = $pendingPlayer;
             }
         }
 
         $joinedCount = $event->players()->wherePivot('status_join', 'joined')->count();
-        $isFull = $joinedCount >= $event->slot_max;
+        // Kapasitas memperhitungkan slot yang sedang ditahan (mode bayar dulu)
+        $occupiedCount = $event->occupiedSlotCount();
+        $isFull = $occupiedCount >= $event->slot_max;
 
         $rolesWithAvailability = [];
         $joinedPlayers = collect();
@@ -48,26 +51,13 @@ class PlayerJoinController extends Controller
             // <=49_000 => +1_500
             // <=99_000 => +3_000
             // >=100_000 => +3% of base
-            $computeAdminFee = function (float $base, string $method) {
-                if ($method !== 'online_banking') {
-                    return 0;
-                }
-                if ($base <= 49000) {
-                    return 1500;
-                }
-                if ($base <= 99000) {
-                    return 3000;
-                }
-                return (int) round($base * 0.03);
-            };
+            $computeAdminFee = fn (float $base, string $method) => PaymentFee::adminFee($base, $method);
             $joinedByRole = $event->players()
                 ->wherePivot('status_join', 'joined')
                 ->orderBy('event_player.created_at', 'asc')
                 ->get(['players.id', 'players.nama', 'players.kontak', 'event_player.role_name', 'event_player.created_at']);
 
-            $roleCounts = $joinedByRole->groupBy(function ($player) {
-                return $player->pivot->role_name ?? 'Tanpa Role';
-            })->map->count();
+            $roleCounts = $event->occupiedSlotCountsByRole();
 
             $joinedPlayers = $joinedByRole->groupBy(function ($player) {
                 return $player->pivot->role_name ?? 'Tanpa Role';
@@ -103,7 +93,22 @@ class PlayerJoinController extends Controller
 
         $waitingCount = $event->waitlists()->where('status','waiting')->count();
 
-        return view('player.join.show', compact('event', 'isFull', 'joinedCount', 'joinedPlayers', 'rolesWithAvailability', 'waitingCount', 'pendingJoinPlayer'));
+        return view('player.join.show', compact('event', 'isFull', 'joinedCount', 'occupiedCount', 'joinedPlayers', 'rolesWithAvailability', 'waitingCount', 'pendingJoinPlayer'));
+    }
+
+    /**
+     * Pendaftaran masih berlaku: sudah joined, atau masih dalam masa tahan slot (mode bayar dulu).
+     */
+    private function isActiveRegistration($player): bool
+    {
+        $status = $player->pivot->status_join;
+
+        if ($status === 'joined') {
+            return true;
+        }
+
+        return $status === 'hold'
+            && Event::holdReleaseAt($player->pivot->payment_expires_at)?->isFuture();
     }
 
     public function store(Request $request, $slug, \App\Services\EventService $eventService)
@@ -117,30 +122,19 @@ class PlayerJoinController extends Controller
             && (int) $pendingJoin['event_id'] === (int) $event->id
         ) {
             $pendingPlayer = $event->players()->where('players.id', $pendingJoin['player_id'])->first();
-            if ($pendingPlayer && $pendingPlayer->pivot->payment_status !== 'paid') {
+            if ($pendingPlayer && $pendingPlayer->pivot->payment_status !== 'paid' && $this->isActiveRegistration($pendingPlayer)) {
                 return back()->withInput()->with('error', 'Anda sudah memiliki pendaftaran tertunda pada event ini. Selesaikan pembayaran atau batalkan pendaftaran sebelumnya terlebih dahulu.');
             }
         }
 
-        $joinedCount = $event->players()->wherePivot('status_join', 'joined')->count();
+        $joinedCount = $event->occupiedSlotCount();
         $waitingCount = $event->waitlists()->where('status', 'waiting')->count();
         $availableSlots = max(0, (int) $event->slot_max - $joinedCount);
         $isFull = $joinedCount >= $event->slot_max;
         $hasWaitingList = $event->enable_waiting_list && ($waitingCount > 0 || $availableSlots <= 1);
         $shouldUseWaitlist = $event->enable_waiting_list && ($isFull || $hasWaitingList);
 
-        $computeAdminFee = function (float $base, string $method) {
-            if ($method !== 'online_banking') {
-                return 0;
-            }
-            if ($base <= 49000) {
-                return 1500;
-            }
-            if ($base <= 99000) {
-                return 3000;
-            }
-            return (int) round($base * 0.03);
-        };
+        $computeAdminFee = fn (float $base, string $method) => PaymentFee::adminFee($base, $method);
 
         if ($shouldUseWaitlist) {
             if ($event->enable_waiting_list) {
@@ -251,6 +245,12 @@ class PlayerJoinController extends Controller
             return back()->with('error', 'Anda sudah bergabung pada pertandingan ini.');
         }
 
+        // Mode bayar dulu: nomor ini masih dalam masa tahan slot → lanjutkan pembayaran yang sama
+        if ($existingPlayer && $this->isActiveRegistration($existingPlayer) && $existingPlayer->pivot->registration_token) {
+            return redirect()->route('registration.show', $existingPlayer->pivot->registration_token)
+                ->with('info', 'Slot Anda masih ditahan. Silakan selesaikan pembayaran.');
+        }
+
         // Cari atau buat player baru menggunakan data base kontak
         $player = Player::firstOrCreate(
             ['kontak' => $validated['kontak']],
@@ -262,18 +262,10 @@ class PlayerJoinController extends Controller
             $player->update(['nama' => $validated['nama']]);
         }
 
+        $selectedRoleSlots = 0;
         if ($event->skema_iuran === 'custom') {
             $selectedRole = collect($event->roles ?? [])->firstWhere('name', $validated['role_name']);
-
             $selectedRoleSlots = isset($selectedRole['slots']) ? (int) $selectedRole['slots'] : 0;
-            $selectedRoleJoinedCount = $event->players()
-                ->wherePivot('status_join', 'joined')
-                ->wherePivot('role_name', $validated['role_name'])
-                ->count();
-
-            if ($selectedRoleSlots > 0 && $selectedRoleJoinedCount >= $selectedRoleSlots) {
-                return back()->withInput()->with('error', "Maaf, slot role {$validated['role_name']} sudah penuh. Silakan pilih role lain.");
-            }
 
             $baseFee = $selectedRole ? (float) $selectedRole['price'] : (float) $event->iuran_per_pemain;
         } elseif ($event->skema_iuran === 'loyalitas') {
@@ -283,44 +275,60 @@ class PlayerJoinController extends Controller
         }
 
         // compute admin fee using same tier rules as in show()
-        $computeAdminFee = function (float $base, string $method) {
-            if ($method !== 'online_banking') {
-                return 0;
-            }
-            if ($base <= 49000) {
-                return 1500;
-            }
-            if ($base <= 99000) {
-                return 3000;
-            }
-            return (int) round($base * 0.03);
-        };
+        $computeAdminFee = fn (float $base, string $method) => PaymentFee::adminFee($base, $method);
 
         $adminFee = $computeAdminFee($baseFee, $event->metode_pembayaran);
 
         $fee = $baseFee + $adminFee;
 
-        // Registrasi langsung disimpan sebagai joined; peserta dapat menyelesaikan pembayaran nanti.
+        // Posisi gratis: tidak perlu pembayaran, langsung tercatat lunas & joined di mode apa pun.
+        $isFree = $fee <= 0;
+        $payFirst = $event->requiresPaymentFirst() && !$isFree;
+
+        // pay_later: langsung joined, pelunasan menyusul lewat link WhatsApp.
+        // pay_first: slot ditahan (hold) selama Event::HOLD_MINUTES; baru joined setelah lunas.
         $paymentPayload = [
-            'status_join' => 'joined',
+            'status_join' => $payFirst ? 'hold' : 'joined',
             'hadir' => false,
             'payment_method' => $event->metode_pembayaran,
             'payment_amount' => $fee,
-            'payment_status' => 'pending',
-            'payment_reference' => null,
-            'payment_paid_at' => null,
+            'payment_status' => $isFree ? 'paid' : 'pending',
+            'payment_reference' => $isFree ? 'GRATIS-' . strtoupper(Str::random(8)) : null,
+            'payment_paid_at' => $isFree ? now() : null,
+            'payment_snap_token' => null,
+            'payment_expires_at' => $payFirst ? now()->addMinutes(Event::HOLD_MINUTES) : null,
         ];
 
         if ($event->skema_iuran === 'custom') {
             $paymentPayload['role_name'] = $validated['role_name'];
         }
 
-        if ($existingPlayer) {
-            $paymentPayload['registration_token'] = $existingPlayer->pivot->registration_token ?: Str::random(40);
-            $event->players()->updateExistingPivot($player->id, $paymentPayload);
-        } else {
-            $paymentPayload['registration_token'] = Str::random(40);
-            $event->players()->attach($player->id, $paymentPayload);
+        $paymentPayload['registration_token'] = $existingPlayer?->pivot->registration_token ?: Str::random(40);
+
+        // Cek kapasitas & simpan dalam satu transaksi (event dikunci) agar slot terakhir tidak terambil dua orang.
+        $slotError = DB::transaction(function () use ($event, $validated, $selectedRoleSlots, $existingPlayer, $player, $paymentPayload) {
+            Event::whereKey($event->id)->lockForUpdate()->first();
+
+            if ($event->occupiedSlotCount() >= (int) $event->slot_max) {
+                return 'Maaf, slot pertandingan sudah penuh.';
+            }
+
+            if ($event->skema_iuran === 'custom' && $selectedRoleSlots > 0
+                && $event->occupiedSlotCount($validated['role_name']) >= $selectedRoleSlots) {
+                return "Maaf, slot role {$validated['role_name']} sudah penuh. Silakan pilih role lain.";
+            }
+
+            if ($existingPlayer) {
+                $event->players()->updateExistingPivot($player->id, $paymentPayload);
+            } else {
+                $event->players()->attach($player->id, $paymentPayload);
+            }
+
+            return null;
+        });
+
+        if ($slotError) {
+            return back()->withInput()->with('error', $slotError);
         }
 
         $registrationToken = $paymentPayload['registration_token'];
@@ -335,7 +343,10 @@ class PlayerJoinController extends Controller
         $eventStart = Carbon::parse($event->tanggal->format('Y-m-d') . ' ' . $event->waktu);
         $cookieMinutes = max(60, min(10080, now()->diffInMinutes($eventStart) + 1440));
 
-        \App\Jobs\SendRegistrationConfirmationJob::dispatch($event->id, $player->id, $registrationToken);
+        if (!$payFirst && !$isFree) {
+            // Link pelunasan dikirim via WhatsApp (saat ini oleh superadmin dari menu Konfirmasi Pendaftaran)
+            \App\Jobs\SendRegistrationConfirmationJob::dispatch($event->id, $player->id, $registrationToken);
+        }
 
         return redirect()->route('registration.show', $registrationToken)
             ->withCookie(cookie('pending_payment_' . $event->id, json_encode([
@@ -471,6 +482,9 @@ class PlayerJoinController extends Controller
 
     public function simulateOnlinePayment($slug)
     {
+        // Hanya untuk pengembangan: di production endpoint ini akan menandai lunas tanpa membayar.
+        abort_unless(app()->environment(['local', 'testing']), 404);
+
         $event = Event::where('slug', $slug)->firstOrFail();
         $joinContext = session('join_context');
 
@@ -598,66 +612,8 @@ class PlayerJoinController extends Controller
 
     public function midtransFinish(Request $request, $slug)
     {
-        $event = Event::where('slug', $slug)->firstOrFail();
-        $joinContext = session('join_context');
-
-        if (
-            !is_array($joinContext)
-            || !isset($joinContext['event_id'], $joinContext['player_id'])
-            || (int) $joinContext['event_id'] !== (int) $event->id
-        ) {
-            return response()->json(['message' => 'Sesi pembayaran tidak ditemukan.'], 422);
-        }
-
-        $player = $event->players()->where('players.id', $joinContext['player_id'])->first();
-        if (!$player) {
-            return response()->json(['message' => 'Data pemain tidak ditemukan.'], 404);
-        }
-
-        $transactionStatus = (string) $request->input('transaction_status', 'pending');
-        $orderId = $request->input('order_id', $player->pivot->payment_reference);
-
-        $newStatus = match ($transactionStatus) {
-            'capture', 'settlement' => 'paid',
-            'deny', 'cancel', 'expire' => 'failed',
-            default => 'pending',
-        };
-
-        $updatePayload = [
-            'payment_status' => $newStatus,
-            'payment_reference' => $orderId,
-            'payment_paid_at' => $newStatus === 'paid' ? now() : null,
-            'payment_expires_at' => $newStatus === 'paid' ? null : $player->pivot->payment_expires_at,
-            'payment_snap_token' => $newStatus === 'paid' ? null : $player->pivot->payment_snap_token,
-        ];
-
-        if ($newStatus === 'paid') {
-            $updatePayload['status_join'] = 'joined';
-        }
-
-        // If the order id doesn't match the current player's pivot, attempt to find the player by order id
-        $targetPlayer = $player;
-        if ($player->pivot->payment_reference !== $orderId) {
-            $found = $event->players()->wherePivot('payment_reference', $orderId)->first();
-            if ($found) {
-                $targetPlayer = $found;
-            }
-        }
-
-        if (!$targetPlayer) {
-            return response()->json(['message' => 'Pemain untuk order ini tidak ditemukan.'], 404);
-        }
-
-        $event->players()->updateExistingPivot($targetPlayer->id, $updatePayload);
-
-        $response = response()->json(['status' => $newStatus]);
-
-        if ($newStatus === 'paid') {
-            session()->flash('success', 'Pembayaran berhasil! Anda telah bergabung dalam event.');
-            $response->withCookie(cookie()->forget('pending_payment_' . $event->id));
-        }
-
-        return $response;
+        // Status dari browser (callback Snap) tidak dipercaya: selalu cek langsung ke Midtrans.
+        return $this->midtransStatus($request, $slug);
     }
 
     public function midtransStatus(Request $request, $slug)
