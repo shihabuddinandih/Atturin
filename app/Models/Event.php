@@ -122,6 +122,7 @@ class Event extends Model
             'hadir',
             'payment_method',
             'payment_amount',
+            'admin_fee',
             'role_name',
             'payment_status',
             'payment_reference',
@@ -193,6 +194,18 @@ class Event extends Model
             ->count();
 
         return $joinedCount >= $this->slot_max;
+    }
+
+    /**
+     * Biaya admin untuk harga dasar tertentu. 0 selama superadmin mematikan saklar biaya admin global.
+     */
+    public function adminFeeFor(float $base): float
+    {
+        if (! \App\Support\PaymentFee::enabled()) {
+            return 0.0;
+        }
+
+        return \App\Support\PaymentFee::adminFee($base, $this->metode_pembayaran);
     }
 
     public function requiresPaymentFirst(): bool

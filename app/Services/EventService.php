@@ -29,6 +29,7 @@ class EventService
                     "CASE
                         WHEN event_player.payment_method != 'online_banking' THEN event_player.payment_amount
                         WHEN event_player.payment_amount <= 0                   THEN 0
+                        WHEN event_player.admin_fee IS NOT NULL               THEN event_player.payment_amount - event_player.admin_fee
                         WHEN event_player.payment_amount <= 50500               THEN event_player.payment_amount - 1500
                         WHEN event_player.payment_amount <= 102000              THEN event_player.payment_amount - 3000
                         ELSE                                                         event_player.payment_amount / 1.03
@@ -132,6 +133,7 @@ class EventService
                 'payment_method' => $player->pivot->payment_method,
                 'payment_method_label' => $player->pivot->payment_method === 'online_banking' ? 'Online Banking' : 'Tunai',
                 'payment_amount' => (float) $player->pivot->payment_amount,
+                'admin_fee' => $player->pivot->admin_fee !== null ? (float) $player->pivot->admin_fee : null,
                 'payment_status' => $player->pivot->payment_status,
                 'payment_reference' => $player->pivot->payment_reference,
                 'contact_status' => optional($contactRequests->get($player->id))->status,
@@ -149,6 +151,7 @@ class EventService
                 return $amt;
             }
             if ($amt <= 0)      return 0.0;
+            if (isset($player['admin_fee'])) return $amt - (float) $player['admin_fee'];
             if ($amt <= 50500)  return $amt - 1500;
             if ($amt <= 102000) return $amt - 3000;
             return $amt / 1.03;

@@ -27,6 +27,7 @@ class Player extends Model
             'hadir',
             'payment_method',
             'payment_amount',
+            'admin_fee',
             'payment_status',
             'payment_reference',
             'payment_paid_at',

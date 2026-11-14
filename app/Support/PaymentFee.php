@@ -11,6 +11,14 @@ namespace App\Support;
  */
 class PaymentFee
 {
+    public const SETTING_KEY = 'admin_fee_enabled';
+
+    /** Saklar global (diatur superadmin). Default mati: peserta bebas biaya admin. */
+    public static function enabled(): bool
+    {
+        return \App\Models\AppSetting::bool(self::SETTING_KEY, false);
+    }
+
     public static function adminFee(float $base, ?string $method = 'online_banking'): float
     {
         if ($method !== 'online_banking' || $base <= 0) {

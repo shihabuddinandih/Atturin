@@ -59,7 +59,7 @@
         $status = $latestJoin ? $latestJoin->pivot->payment_status : 'pending';
         $statusLabel = strtoupper($status);
 
-        $computeAdminFee = fn (float $base, string $method) => \App\Support\PaymentFee::adminFee($base, $method);
+        $computeAdminFee = fn (float $base, ?string $method = null) => $event->adminFeeFor($base);
 
         if ($latestJoin) {
             $paymentAmount = (float) $latestJoin->pivot->payment_amount;

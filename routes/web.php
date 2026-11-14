@@ -91,6 +91,9 @@ Route::middleware(['auth', 'superadmin'])->prefix('superadmin')->name('superadmi
     Route::get('registration-confirmations/{event}/{player}/send', [\App\Http\Controllers\SuperAdminRegistrationConfirmationController::class, 'send'])->name('registration-confirmations.send');
     Route::post('registration-confirmations/{event}/{player}/invalidate', [\App\Http\Controllers\SuperAdminRegistrationConfirmationController::class, 'invalidate'])->name('registration-confirmations.invalidate');
 
+    Route::get('admin-fee', [\App\Http\Controllers\SuperAdminAdminFeeController::class, 'index'])->name('admin-fee.index');
+    Route::patch('admin-fee', [\App\Http\Controllers\SuperAdminAdminFeeController::class, 'update'])->name('admin-fee.update');
+
     Route::get('player-contact-requests', [SuperAdminPlayerContactRequestController::class, 'index'])->name('player-contact-requests.index');
     Route::get('player-contact-requests/{contactRequest}/send', [SuperAdminPlayerContactRequestController::class, 'send'])->name('player-contact-requests.send');
 });

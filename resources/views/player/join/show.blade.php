@@ -40,7 +40,7 @@
         $isCustomEvent = $event->skema_iuran === 'custom';
         $rolesWithAvailability = $rolesWithAvailability ?? [];
         $customRoles = count($rolesWithAvailability) ? $rolesWithAvailability : ($event->roles ?? []);
-        $computeAdminFee = fn (float $base, string $method) => \App\Support\PaymentFee::adminFee($base, $method);
+        $computeAdminFee = fn (float $base, ?string $method = null) => $event->adminFeeFor($base);
         $rupiah = fn ($v) => 'Rp ' . number_format((float) $v, 0, ',', '.');
         $initials = fn ($name) => Str::upper(Str::substr(collect(preg_split('/\s+/', trim((string) $name)))->filter()->take(2)->map(fn ($w) => Str::substr($w, 0, 1))->implode(''), 0, 2)) ?: '?';
 

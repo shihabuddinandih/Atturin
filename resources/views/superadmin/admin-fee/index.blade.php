@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <title>Biaya Admin — {{ config('app.name', 'Atturin') }}</title>
+    <link rel="icon" type="image/png" href="{{ asset('images/Logo/Logo (Lettermark)/Primary Dark.png') }}">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#F0F5FF',
+                            100: '#E1E9FF',
+                            500: '#0052FF',
+                            600: '#0042CC',
+                            700: '#003199',
+                            900: '#0A1628',
+                        },
+                        violet: {
+                            50: '#F5F3FF',
+                            100: '#EDE9FE',
+                            500: '#8B5CF6',
+                            600: '#7C3AED',
+                            700: '#6D28D9',
+                        },
+                        surface: '#F8FAFC',
+                    },
+                    fontFamily: {
+                        sans: ['Outfit', 'sans-serif'],
+                    },
+                },
+            },
+        }
+    </script>
+    <style>
+        body { font-family: 'Outfit', sans-serif; }
+        .sidebar { width: 280px; }
+        .main-content { margin-left: 280px; }
+        .sidebar-link {
+            display: flex; align-items: center; gap: 12px;
+            padding: 12px 18px; border-radius: 12px;
+            font-size: 15px; font-weight: 500; color: #94A3B8;
+            transition: all 0.2s ease;
+            position: relative;
+        }
+        .sidebar-link:hover { background: rgba(255,255,255,0.05); color: #fff; }
+        .sidebar-link.active {
+            background: rgba(255,255,255,0.1); color: #fff; font-weight: 600;
+        }
+        .sidebar-link.active::before {
+            content: ''; position: absolute; left: -12px; top: 8px; bottom: 8px; width: 4px; border-radius: 0 4px 4px 0; background: #8B5CF6;
+        }
+        .pro-card { background: #fff; border-radius: 20px; border: 1px solid #E2E8F0; box-shadow: 0 1px 3px rgba(0,0,0,0.02); }
+    </style>
+</head>
+<body class="bg-surface text-slate-800 antialiased min-h-screen">
+    <aside class="sidebar fixed top-0 left-0 bottom-0 bg-[#0A1628] border-r border-slate-800 flex flex-col z-40">
+        <div class="px-7 pt-7 pb-5">
+            <div class="flex items-center gap-3">
+                <img src="{{ asset('images/Logo/Logo (Lettermark)/Secondary.png') }}" class="h-8 object-contain" alt="Logo">
+                <div>
+                    <h1 class="text-white text-base font-bold tracking-wide">Atturin HQ</h1>
+                    <span class="text-violet-400 text-[10px] uppercase font-bold tracking-widest">Super Admin</span>
+                </div>
+            </div>
+        </div>
+
+        <nav class="flex-1 px-4 py-4 space-y-1">
+            <a href="{{ route('superadmin.withdrawals.index') }}" class="sidebar-link {{ request()->routeIs('superadmin.withdrawals.index') ? 'active' : '' }}">
+                <svg class="w-5 h-5 text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                Penarikan Dana (Withdraw)
+            </a>
+            <a href="{{ route('superadmin.registration-confirmations.index') }}" class="sidebar-link {{ request()->routeIs('superadmin.registration-confirmations.*') ? 'active' : '' }}">
+                <svg class="w-5 h-5 text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
+                Konfirmasi Pendaftaran
+            </a>
+            <a href="{{ route('superadmin.waitlist-reminders.index') }}" class="sidebar-link {{ request()->routeIs('superadmin.waitlist-reminders.*') ? 'active' : '' }}">
+                <svg class="w-5 h-5 text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M8 10h.01M12 10h.01M16 10h.01M9 16h6M5 6h14a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2z"/></svg>
+                Reminder Waiting List
+            </a>
+            <a href="{{ route('superadmin.payment-reminders.index') }}" class="sidebar-link {{ request()->routeIs('superadmin.payment-reminders.*') ? 'active' : '' }}">
+                <svg class="w-5 h-5 text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                Reminder Pembayaran
+            </a>
+            <a href="{{ route('superadmin.admin-fee.index') }}" class="sidebar-link {{ request()->routeIs('superadmin.admin-fee.*') ? 'active' : '' }}">
+                <svg class="w-5 h-5 text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/></svg>
+                Biaya Admin
+            </a>
+            <a href="{{ route('superadmin.player-contact-requests.index') }}" class="sidebar-link {{ request()->routeIs('superadmin.player-contact-requests.*') ? 'active' : '' }}">
+                <svg class="w-5 h-5 text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
+                Permintaan Kontak Peserta
+            </a>
+        </nav>
+
+        <div class="px-5 pb-7 pt-4 border-t border-slate-800">
+            <form method="POST" action="{{ route('logout') }}">
+                @csrf
+                <button type="submit" class="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl border border-slate-700 text-sm font-semibold text-slate-300 hover:border-rose-500 hover:text-rose-500 transition-colors">
+                    Logout
+                </button>
+            </form>
+        </div>
+    </aside>
+
+    <div class="main-content min-h-screen p-8 lg:p-10 flex flex-col gap-6">
+        <div>
+            <h2 class="text-2xl font-bold text-slate-900">Biaya Admin</h2>
+            <p class="text-sm text-slate-500 mt-1">Saklar global biaya admin pembayaran online untuk seluruh peserta di semua event.</p>
+        </div>
+
+        @if(session('success'))
+            <div class="bg-emerald-50 border border-emerald-200 text-emerald-800 px-4 py-3 rounded-xl text-sm">{{ session('success') }}</div>
+        @endif
+        @if($errors->any())
+            <div class="bg-rose-50 border border-rose-200 text-rose-800 px-4 py-3 rounded-xl text-sm">{{ $errors->first() }}</div>
+        @endif
+
+        <div class="pro-card p-6 sm:p-8 max-w-2xl">
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-5">
+                <div class="flex items-center gap-4">
+                    <span class="relative inline-flex h-7 w-12 flex-shrink-0 rounded-full {{ $enabled ? 'bg-emerald-500' : 'bg-slate-300' }}">
+                        <span class="absolute top-1 h-5 w-5 rounded-full bg-white shadow {{ $enabled ? 'left-6' : 'left-1' }}"></span>
+                    </span>
+                    <div>
+                        <p class="text-lg font-bold text-slate-900">Biaya admin: {{ $enabled ? 'AKTIF' : 'MATI' }}</p>
+                        <p class="text-sm text-slate-500">
+                            {{ $enabled ? 'Peserta membayar harga posisi + biaya admin.' : 'Peserta bebas biaya admin, hanya membayar harga posisi.' }}
+                        </p>
+                    </div>
+                </div>
+                <form method="POST" action="{{ route('superadmin.admin-fee.update') }}"
+                      onsubmit="return confirm('{{ $enabled ? 'Matikan biaya admin untuk semua peserta?' : 'Nyalakan biaya admin untuk semua pendaftaran baru?' }}');">
+                    @csrf
+                    @method('PATCH')
+                    <input type="hidden" name="enabled" value="{{ $enabled ? 0 : 1 }}">
+                    <button type="submit"
+                            class="w-full sm:w-auto rounded-xl px-5 py-2.5 text-sm font-semibold text-white shadow-sm {{ $enabled ? 'bg-rose-600 hover:bg-rose-700' : 'bg-violet-600 hover:bg-violet-700' }}">
+                        {{ $enabled ? 'Matikan Biaya Admin' : 'Nyalakan Biaya Admin' }}
+                    </button>
+                </form>
+            </div>
+
+            <div class="mt-6 border-t border-slate-100 pt-5">
+                <p class="text-sm font-semibold text-slate-700 mb-3">Tarif saat aktif (pembayaran online)</p>
+                <dl class="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
+                    <div class="rounded-xl bg-slate-50 px-4 py-3"><dt class="text-slate-500">Harga ≤ Rp 49.000</dt><dd class="font-bold text-slate-900">+ Rp 1.500</dd></div>
+                    <div class="rounded-xl bg-slate-50 px-4 py-3"><dt class="text-slate-500">Harga ≤ Rp 99.000</dt><dd class="font-bold text-slate-900">+ Rp 3.000</dd></div>
+                    <div class="rounded-xl bg-slate-50 px-4 py-3"><dt class="text-slate-500">Di atas itu</dt><dd class="font-bold text-slate-900">+ 3%</dd></div>
+                </dl>
+                <p class="text-xs text-slate-500 mt-4">Posisi gratis dan pembayaran tunai tidak pernah dikenai biaya admin. Perubahan saklar hanya berlaku untuk pendaftaran baru; tagihan yang sudah dibuat tidak berubah.</p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

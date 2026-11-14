@@ -41,7 +41,8 @@ class WaitlistController extends Controller
                 // Tidak memakai event_waitlists.payment_amount karena baris lama bernilai default 0.
                 $role = $entry->role_name ? collect($event->roles ?? [])->firstWhere('name', $entry->role_name) : null;
                 $basePrice = $role ? (float) ($role['price'] ?? 0) : (float) $event->iuran_per_pemain;
-                $amount = \App\Support\PaymentFee::total($basePrice, $event->metode_pembayaran);
+                $adminFee = $event->adminFeeFor($basePrice);
+                $amount = $basePrice + $adminFee;
                 $isFree = $amount <= 0;
                 $payFirst = $event->requiresPaymentFirst() && !$isFree;
                 $player = $entry->player;
@@ -60,6 +61,7 @@ class WaitlistController extends Controller
                     'hadir' => false,
                     'payment_method' => $event->metode_pembayaran,
                     'payment_amount' => $amount,
+                    'admin_fee' => $adminFee,
                     'role_name' => $entry->role_name,
                     'payment_status' => $isFree ? 'paid' : 'pending',
                     'payment_reference' => $isFree ? 'GRATIS-' . strtoupper(Str::random(8)) : null,

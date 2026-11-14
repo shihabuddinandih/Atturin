@@ -51,7 +51,7 @@ class PlayerJoinController extends Controller
             // <=49_000 => +1_500
             // <=99_000 => +3_000
             // >=100_000 => +3% of base
-            $computeAdminFee = fn (float $base, string $method) => PaymentFee::adminFee($base, $method);
+            $computeAdminFee = fn (float $base, ?string $method = null) => $event->adminFeeFor($base);
             $joinedByRole = $event->players()
                 ->wherePivot('status_join', 'joined')
                 ->orderBy('event_player.created_at', 'asc')
@@ -134,7 +134,7 @@ class PlayerJoinController extends Controller
         $hasWaitingList = $event->enable_waiting_list && ($waitingCount > 0 || $availableSlots <= 1);
         $shouldUseWaitlist = $event->enable_waiting_list && ($isFull || $hasWaitingList);
 
-        $computeAdminFee = fn (float $base, string $method) => PaymentFee::adminFee($base, $method);
+        $computeAdminFee = fn (float $base, ?string $method = null) => $event->adminFeeFor($base);
 
         if ($shouldUseWaitlist) {
             if ($event->enable_waiting_list) {
@@ -275,7 +275,7 @@ class PlayerJoinController extends Controller
         }
 
         // compute admin fee using same tier rules as in show()
-        $computeAdminFee = fn (float $base, string $method) => PaymentFee::adminFee($base, $method);
+        $computeAdminFee = fn (float $base, ?string $method = null) => $event->adminFeeFor($base);
 
         $adminFee = $computeAdminFee($baseFee, $event->metode_pembayaran);
 
@@ -292,6 +292,7 @@ class PlayerJoinController extends Controller
             'hadir' => false,
             'payment_method' => $event->metode_pembayaran,
             'payment_amount' => $fee,
+            'admin_fee' => $adminFee,
             'payment_status' => $isFree ? 'paid' : 'pending',
             'payment_reference' => $isFree ? 'GRATIS-' . strtoupper(Str::random(8)) : null,
             'payment_paid_at' => $isFree ? now() : null,

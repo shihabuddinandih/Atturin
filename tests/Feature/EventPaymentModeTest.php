@@ -29,6 +29,9 @@ class EventPaymentModeTest extends TestCase
         parent::setUp();
 
         $this->admin = User::factory()->create(['role' => 'admin']);
+
+        // Sebagian besar test memeriksa nominal dengan biaya admin; default produksi = mati.
+        \App\Models\AppSetting::set(\App\Support\PaymentFee::SETTING_KEY, '1');
     }
 
     private function makeEvent(string $mode, int $slots = 1, bool $waitlist = false): Event
@@ -232,6 +235,42 @@ class EventPaymentModeTest extends TestCase
             ->assertSee('Anda Terdaftar!')
             ->assertSee('calendar.google.com', false)
             ->assertDontSee('id="midtrans-pay-button"', false);
+    }
+
+    public function test_admin_fee_is_off_by_default_and_superadmin_can_turn_it_on(): void
+    {
+        // Kondisi awal platform: belum ada pengaturan sama sekali → biaya admin mati.
+        \App\Models\AppSetting::query()->delete();
+        \Illuminate\Support\Facades\Cache::flush();
+        $this->assertFalse(\App\Support\PaymentFee::enabled());
+
+        $event = $this->makeEvent(Event::PAYMENT_MODE_PAY_LATER, slots: 3);
+        $this->register($event, '081777');
+        $pivot = $this->pivotFor($event, '081777');
+        $this->assertEquals(20000, (float) $pivot->payment_amount);
+        $this->assertEquals(0, (float) $pivot->admin_fee);
+
+        $superadmin = User::factory()->create(['role' => 'superadmin']);
+        $this->actingAs($superadmin)->get(route('superadmin.admin-fee.index'))->assertOk()->assertSee('MATI');
+        $this->actingAs($superadmin)
+            ->patch(route('superadmin.admin-fee.update'), ['enabled' => 1])
+            ->assertRedirect();
+        $this->assertTrue(\App\Support\PaymentFee::enabled());
+        \Illuminate\Support\Facades\Auth::logout();
+
+        // Pendaftar baru kena biaya admin, tagihan lama tetap.
+        $this->register($event, '081778', 'Andi');
+        $this->assertEquals(21500, (float) $this->pivotFor($event, '081778')->payment_amount);
+        $this->assertEquals(1500, (float) $this->pivotFor($event, '081778')->admin_fee);
+        $this->assertEquals(20000, (float) $this->pivotFor($event, '081777')->payment_amount);
+    }
+
+    public function test_admin_cannot_toggle_admin_fee(): void
+    {
+        \App\Models\AppSetting::set(\App\Support\PaymentFee::SETTING_KEY, '0');
+        $this->actingAs($this->admin)
+            ->patch(route('superadmin.admin-fee.update'), ['enabled' => 1]);
+        $this->assertFalse(\App\Support\PaymentFee::enabled());
     }
 
     public function test_admin_fee_rules(): void
