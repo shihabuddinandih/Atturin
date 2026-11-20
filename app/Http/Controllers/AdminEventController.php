@@ -112,16 +112,7 @@ class AdminEventController extends Controller
             return ((float) $role['price']) * ((int) $role['slots']);
         }, $roles));
 
-        $validated['facilities'] = array_values(array_map(function ($facility) {
-            return [
-                'key' => $facility['key'],
-                'note' => trim((string) ($facility['note'] ?? '')) !== '' ? trim($facility['note']) : null,
-            ];
-        }, $validated['facilities'] ?? []));
-
-        if (empty($validated['facilities'])) {
-            $validated['facilities'] = null;
-        }
+        $validated['facilities'] = $this->normalizeFacilities($validated['facilities'] ?? []);
 
         // Calculate iuran_per_pemain for both schemes
         $validated['iuran_per_pemain'] = $validated['slot_max'] > 0
@@ -143,6 +134,67 @@ class AdminEventController extends Controller
         $joinedCount = $livePayload['metrics']['joined_count'];
 
         return view('admin.events.show', compact('event', 'joinedCount', 'livePayload'));
+    }
+
+    public function edit(Event $event)
+    {
+        $this->authorize('update', $event);
+
+        return view('admin.events.edit', compact('event'));
+    }
+
+    /**
+     * Perbarui detail event. Posisi, kuota, harga, dan alur pembayaran sengaja tidak bisa
+     * diubah di sini karena terkait pembayaran peserta yang mungkin sudah berjalan.
+     */
+    public function update(Request $request, Event $event)
+    {
+        $this->authorize('update', $event);
+
+        $validated = $request->validate([
+            'nama_event' => 'required|string|max:255',
+            'tanggal' => 'required|date',
+            'waktu' => 'required',
+            'tempat' => 'required|string|max:255',
+            'facilities' => 'nullable|array',
+            'facilities.*.key' => 'required_with:facilities|string|in:' . implode(',', array_keys(FacilityCatalog::options())),
+            'facilities.*.note' => 'nullable|string|max:255',
+            'show_joined_players_public' => 'nullable|boolean',
+            'show_joined_player_contacts_public' => 'nullable|boolean',
+            'enable_waiting_list' => 'nullable|boolean',
+            'banner_image' => 'nullable|image|max:2048',
+            'remove_banner' => 'nullable|boolean',
+        ]);
+
+        $payload = [
+            'nama_event' => $validated['nama_event'],
+            'tanggal' => $validated['tanggal'],
+            'waktu' => $validated['waktu'],
+            'tempat' => $validated['tempat'],
+            'facilities' => $this->normalizeFacilities($validated['facilities'] ?? []),
+            'enable_waiting_list' => $request->boolean('enable_waiting_list'),
+            'show_joined_players_public' => $request->boolean('show_joined_players_public'),
+            'show_joined_player_contacts_public' => $request->boolean('show_joined_player_contacts_public'),
+        ];
+
+        if (! $payload['show_joined_players_public']) {
+            $payload['show_joined_player_contacts_public'] = false;
+        }
+
+        $oldBanner = $event->banner_image;
+        if ($request->hasFile('banner_image')) {
+            $payload['banner_image'] = $request->file('banner_image')->store('banners', 'public');
+        } elseif ($request->boolean('remove_banner')) {
+            $payload['banner_image'] = null;
+        }
+
+        $event->update($payload);
+
+        if (array_key_exists('banner_image', $payload) && $oldBanner && $oldBanner !== $payload['banner_image']) {
+            Storage::disk('public')->delete($oldBanner);
+        }
+
+        return redirect()->route('admin.events.show', $event)->with('success', 'Detail event berhasil diperbarui.');
     }
 
     public function destroy(Event $event)
@@ -324,6 +376,24 @@ class AdminEventController extends Controller
         }
 
         return back()->with('success', $message);
+    }
+
+    /**
+     * @param  array<int, array{key: string, note?: string|null}>  $facilities
+     * @return array<int, array{key: string, note: string|null}>|null
+     */
+    private function normalizeFacilities(array $facilities): ?array
+    {
+        $normalized = array_values(array_map(function ($facility) {
+            $note = trim((string) ($facility['note'] ?? ''));
+
+            return [
+                'key' => $facility['key'],
+                'note' => $note !== '' ? $note : null,
+            ];
+        }, $facilities));
+
+        return $normalized ?: null;
     }
 
     private function promoteNextWaitingPlayer(Event $event): void
